@@ -10,6 +10,12 @@ Sony's official "Sound Connect" app (Android/iOS only) talks to the headphones o
 
 **Current feature scope:** device detection, live battery, noise-canceling / ambient-sound mode with a continuous ambient level slider and focus-on-voice, and the 5-band + Clear Bass equalizer (Heavy / Clear / Hard / Soft / Custom presets). Verified against the WH-1000XM6.
 
+## Screenshots
+
+| Connect | Dashboard |
+|---|---|
+| ![No headphones connected — Connect screen](docs/screenshots/connect-idle.png) | ![Connected dashboard — noise control and equalizer](docs/screenshots/dashboard.png) |
+
 ## Requirements
 
 - Headphones already paired in your OS Bluetooth settings — Nullpoint cannot pair for you.
