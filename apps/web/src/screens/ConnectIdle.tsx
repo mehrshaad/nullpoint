@@ -1,3 +1,4 @@
+import { DeviceArt } from "../components/DeviceArt.js";
 import { TitleBar } from "./TitleBar.js";
 
 /** design/SoundConnect Desktop.dc.html §1b "IDLE — NO DEVICE" */
@@ -22,10 +23,14 @@ export function ConnectIdle({ onConnect }: { onConnect: () => void }) {
             borderRadius: 16,
             border: "1px solid var(--line)",
             backgroundColor: "var(--panel2)",
-            backgroundImage:
-              "repeating-linear-gradient(135deg, transparent 0 6px, var(--stripe) 6px 7px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
           }}
-        />
+        >
+          {/* No device yet — the generic silhouette reads better than an abstract placeholder. */}
+          <DeviceArt model={null} size={64} color="var(--fg3)" />
+        </div>
         <div style={{ marginTop: 26, fontWeight: 600, fontSize: 26, letterSpacing: "-0.02em", color: "var(--fg)" }}>
           No headphones connected
         </div>

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { EqBands, Headphones, HeadphonesState } from "@ssc/core";
 import { AmbientSoundMode, BatteryChargingStatus, noiseModeFromState } from "@ssc/core";
 import { TitleBar } from "./TitleBar.js";
+import { DeviceArt } from "../components/DeviceArt.js";
 import { NoiseModeSegmented } from "../components/NoiseModeSegmented.js";
 import { AmbientLevelSlider } from "../components/AmbientLevelSlider.js";
 import { EqualizerPanel } from "../components/EqualizerPanel.js";
@@ -103,9 +104,13 @@ export function Dashboard({
             borderRadius: 10,
             border: "1px solid var(--line)",
             backgroundColor: "var(--panel2)",
-            backgroundImage: "repeating-linear-gradient(135deg, transparent 0 5px, var(--stripe) 5px 6px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
           }}
-        />
+        >
+          <DeviceArt model={state.modelName} size={38} />
+        </div>
         <div style={{ minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
             <div style={{ fontWeight: 600, fontSize: 19, letterSpacing: "-0.01em", color: "var(--fg)" }}>

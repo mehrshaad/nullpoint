@@ -1,6 +1,6 @@
 {
   "name": "@ssc/transport-webserial",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Web Serial (RFCOMM-over-Bluetooth-Classic) Transport implementation for @ssc/core",
   "license": "Apache-2.0",

@@ -20,7 +20,7 @@ const RECONNECT_DELAY_MS = 1500;
  * "one controller"/reconnecting state), retries against the *same* already-granted port without
  * needing a new user gesture, since Web Serial permission persists for a previously picked port.
  */
-export function useHeadphones() {
+export function useHeadphones({ autoReconnect = true }: { autoReconnect?: boolean } = {}) {
   const [connection, setConnection] = useState<ConnectionStatus>(
     WebSerialTransport.isSupported() ? { status: "idle" } : { status: "unsupported" }
   );
@@ -28,6 +28,10 @@ export function useHeadphones() {
   const headphonesRef = useRef<Headphones | null>(null);
   const attemptReconnectRef = useRef<(port: SerialPort) => void>(() => {});
   const cancelledRef = useRef(false);
+  // Read through a ref so an in-flight connection picks up a settings change without
+  // needing to be torn down and re-established.
+  const autoReconnectRef = useRef(autoReconnect);
+  autoReconnectRef.current = autoReconnect;
 
   const establish = useCallback(async (port: SerialPort): Promise<HeadphonesState> => {
     const transport = new WebSerialTransport(port);
@@ -35,7 +39,12 @@ export function useHeadphones() {
     headphonesRef.current = headphones;
     headphones.on((event) => {
       setDeviceState({ ...headphones.state });
-      if (event.type === "disconnected") attemptReconnectRef.current(port);
+      if (event.type !== "disconnected") return;
+      if (autoReconnectRef.current) {
+        attemptReconnectRef.current(port);
+      } else {
+        setConnection({ status: "failed", message: "The headphones disconnected." });
+      }
     });
     return headphones.connect();
   }, []);

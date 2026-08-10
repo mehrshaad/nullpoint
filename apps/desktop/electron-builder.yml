@@ -1,0 +1,47 @@
+appId: ir.ali-dadashzadeh.nullpoint
+productName: Nullpoint
+copyright: Copyright © 2026 Nullpoint contributors. Not affiliated with Sony Group Corporation.
+
+directories:
+  output: release
+  buildResources: build
+
+# dist-electron/ is the compiled main+preload; assets/ holds the tray icon, loaded at runtime.
+files:
+  - dist-electron/**/*
+  - assets/**/*
+  - package.json
+
+# The renderer is the web app's production build, served over the app:// protocol (see main.ts).
+extraResources:
+  - from: ../web/dist
+    to: renderer
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: build/icon.ico
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Nullpoint
+
+mac:
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+  category: public.app-category.utilities
+  # electron-builder converts this to .icns at build time.
+  icon: build/icon.png
+  # Menu-bar resident: main.ts hides the Dock icon while no window is open.
+  extendInfo:
+    LSUIElement: false
+
+linux:
+  target: [AppImage]
+  category: Utility

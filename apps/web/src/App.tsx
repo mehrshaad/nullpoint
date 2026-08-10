@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useHeadphones } from "./state/useHeadphones.js";
+import { useSettings } from "./state/useSettings.js";
 import { ConnectIdle } from "./screens/ConnectIdle.js";
 import { Connecting } from "./screens/Connecting.js";
 import { ConnectFailed } from "./screens/ConnectFailed.js";
@@ -8,10 +9,22 @@ import { Dashboard } from "./screens/Dashboard.js";
 import { Settings } from "./screens/Settings.js";
 
 export function App() {
-  const { connection, deviceState, connect, reset, headphones } = useHeadphones();
+  const { settings, update, isDesktop } = useSettings();
+  const { connection, deviceState, connect, reset, headphones } = useHeadphones({
+    autoReconnect: settings.reconnectAutomatically,
+  });
   const [showSettings, setShowSettings] = useState(false);
 
-  if (showSettings) return <Settings onDone={() => setShowSettings(false)} />;
+  if (showSettings) {
+    return (
+      <Settings
+        settings={settings}
+        update={update}
+        isDesktop={isDesktop}
+        onDone={() => setShowSettings(false)}
+      />
+    );
+  }
 
   switch (connection.status) {
     case "unsupported":

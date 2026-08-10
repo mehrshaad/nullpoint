@@ -13,10 +13,6 @@ importers:
         version: 5.9.3
 
   apps/desktop:
-    dependencies:
-      '@ssc/core':
-        specifier: workspace:*
-        version: link:../../packages/core
     devDependencies:
       '@types/node':
         specifier: ^22.9.0
