@@ -93,18 +93,23 @@ function chunk(type, data) {
   return Buffer.concat([len, body, crc]);
 }
 
-/** Encodes an RGBA pixel buffer as a PNG (color type 6). */
+/** Encodes a square RGBA pixel buffer as a PNG. */
 function encodePng(px, size) {
-  const stride = size * 4;
-  const raw = Buffer.alloc((1 + stride) * size);
-  for (let y = 0; y < size; y++) {
+  return encodePngSized(px, size, size);
+}
+
+/** Encodes an RGBA pixel buffer as a PNG (color type 6). */
+function encodePngSized(px, width, height) {
+  const stride = width * 4;
+  const raw = Buffer.alloc((1 + stride) * height);
+  for (let y = 0; y < height; y++) {
     raw[y * (1 + stride)] = 0; // filter: none
     Buffer.from(px.buffer, y * stride, stride).copy(raw, y * (1 + stride) + 1);
   }
 
   const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(size, 0);
-  ihdr.writeUInt32BE(size, 4);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
   ihdr[8] = 8; // bit depth
   ihdr[9] = 6; // color type: RGBA
   return Buffer.concat([
@@ -140,6 +145,38 @@ function encodeIco(entries) {
   return Buffer.concat([header, ...dir, ...entries.map((e) => e.png)]);
 }
 
+/**
+ * Open Graph card: the app-background field with the Nullpoint mark centred, so shared links
+ * read as the product rather than as a bare screenshot. 1200x630, RGBA.
+ */
+function encodeOgCard() {
+  const W = 1200;
+  const H = 630;
+  const px = new Uint8Array(W * H * 4);
+  const cx = W / 2;
+  const cy = H / 2;
+  const r = 84;
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      let hits = 0;
+      for (let sy = 0; sy < SS; sy++) {
+        for (let sx = 0; sx < SS; sx++) {
+          const dx = x + (sx + 0.5) / SS - cx;
+          const dy = y + (sy + 0.5) / SS - cy;
+          if (dx * dx + dy * dy <= r * r) hits++;
+        }
+      }
+      const a = hits / (SS * SS);
+      const i = (y * W + x) * 4;
+      px[i] = Math.round(ACCENT[0] * a + BG[0] * (1 - a));
+      px[i + 1] = Math.round(ACCENT[1] * a + BG[1] * (1 - a));
+      px[i + 2] = Math.round(ACCENT[2] * a + BG[2] * (1 - a));
+      px[i + 3] = 255;
+    }
+  }
+  return encodePngSized(px, W, H);
+}
+
 function write(relPath, buf) {
   const full = join(repoRoot, relPath);
   mkdirSync(dirname(full), { recursive: true });
@@ -151,6 +188,16 @@ function write(relPath, buf) {
 for (const size of [192, 512]) {
   write(`apps/web/public/icons/icon-${size}.png`, encodePng(render(size, "app"), size));
 }
+
+// Browser tab icons. The .ico covers older browsers that ignore <link rel="icon" type=png>.
+write("apps/web/public/favicon-32.png", encodePng(render(32, "app"), 32));
+write(
+  "apps/web/public/favicon.ico",
+  encodeIco([16, 32, 48].map((size) => ({ size, png: encodePng(render(size, "app"), size) })))
+);
+// Social preview card (og:image). 1200x630 is the conventional aspect; we letterbox the mark
+// onto the app background rather than stretching it.
+write("apps/web/public/og-image.png", encodeOgCard());
 
 // Desktop app icon (.ico wants a range of sizes; 256 is required by electron-builder)
 write(
