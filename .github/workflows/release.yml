@@ -1,0 +1,64 @@
+name: Release desktop apps
+
+# Builds the desktop app for each platform on its own runner (a .dmg can only be produced on
+# macOS) and attaches the installers to the release for the tag.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to build and upload to (e.g. v0.2.0)
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: Windows
+            args: --win
+            artifacts: "apps/desktop/release/*.exe"
+          - os: macos-latest
+            name: macOS
+            # Both architectures: Apple Silicon and Intel.
+            args: --mac --arm64 --x64
+            artifacts: "apps/desktop/release/*.dmg"
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Builds @ssc/web (the renderer, copied in as extraResources) and its workspace deps.
+      - run: pnpm --filter "@ssc/web..." run build
+
+      - run: pnpm --filter @ssc/desktop run build
+
+      - name: Package
+        working-directory: apps/desktop
+        # No signing identity is configured, so tell electron-builder not to go looking for one;
+        # otherwise the macOS build fails instead of producing an unsigned app.
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: pnpm exec electron-builder --config electron-builder.yml ${{ matrix.args }}
+
+      - name: Attach installers to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+        shell: bash
+        run: gh release upload "$TAG" ${{ matrix.artifacts }} --clobber --repo "$GITHUB_REPOSITORY"
