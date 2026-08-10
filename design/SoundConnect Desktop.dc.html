@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  body { margin: 0; background: #0E0F11; }
+  a { color: #6EA6EF; text-decoration: none; }
+  a:hover { color: #9AC4F5; text-decoration: underline; }
+  @keyframes np-spin { to { transform: rotate(360deg) } }
+  @keyframes np-pulse { 0% { opacity: .95 } 50% { opacity: .3 } 100% { opacity: .95 } }
+</style>
+</helmet>
+<div style="--bg:#0B0C0E;--panel:#121418;--panel2:#191C21;--line:#25292F;--track:#1D2126;--fg:#E7E9EC;--fg2:#9BA2AB;--fg3:#6B727C;--stripe:#2A2F36;--accent:#6EA6EF;--accentSoft:rgba(110,166,239,.14);--amber:#E0A15C;--ok:#7FC29B;--warn:#E58A6B;background:#0E0F11;color:#E7E9EC;font-family:'IBM Plex Sans',system-ui,sans-serif;padding:56px 56px 120px;display:flex;flex-direction:column;gap:14px;min-width:2000px">
+
+  <section data-screen-label="Cover" style="display:flex;flex-direction:column;gap:28px;padding-bottom:8px">
+    <div style="display:flex;align-items:flex-end;gap:40px;flex-wrap:wrap">
+      <div style="max-width:640px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px">
+          <div style="width:13px;height:13px;border-radius:50%;background:#6EA6EF"></div>
+          <div style="font:600 13px/1 'IBM Plex Mono',monospace;letter-spacing:.28em;color:#E7E9EC">NULLPOINT</div>
+        </div>
+        <h1 style="margin:0;font:700 44px/1.06 'IBM Plex Sans',sans-serif;letter-spacing:-.03em;color:#F2F4F6;text-wrap:pretty">An unofficial desktop &amp; web client for Sony headphones</h1>
+        <p style="margin:18px 0 0;font:400 15.5px/1.6 'IBM Plex Sans',sans-serif;color:#9BA2AB;max-width:560px;text-wrap:pretty">Electron for Windows &amp; macOS, Chromium PWA on the web, one responsive React surface. Precise, calm, hardware-adjacent — a control panel, not a consumer toy.</p>
+        <div style="margin-top:20px;font:400 11px/1.7 'IBM Plex Mono',monospace;color:#6B727C">NOT AFFILIATED WITH, ENDORSED BY, OR CONNECTED TO SONY GROUP CORPORATION.<br />PRODUCT AND MODEL NAMES ARE USED FOR COMPATIBILITY IDENTIFICATION ONLY.</div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(2,minmax(150px,1fr));gap:10px;flex:1;min-width:330px;max-width:520px">
+        <div style="padding:13px 14px;border:1px solid #25292F;border-radius:10px;background:#121418">
+          <div style="font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#6B727C">DESKTOP</div>
+          <div style="margin-top:8px;font:600 14px/1.3 'IBM Plex Sans',sans-serif">900 × 640 min 720 × 560</div>
+        </div>
+        <div style="padding:13px 14px;border:1px solid #25292F;border-radius:10px;background:#121418">
+          <div style="font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#6B727C">TRAY POPOVER</div>
+          <div style="margin-top:8px;font:600 14px/1.3 'IBM Plex Sans',sans-serif">320 × 420 fixed</div>
+        </div>
+        <div style="padding:13px 14px;border:1px solid #25292F;border-radius:10px;background:#121418">
+          <div style="font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#6B727C">TRANSPORT</div>
+          <div style="margin-top:8px;font:600 14px/1.3 'IBM Plex Sans',sans-serif">Web Bluetooth GATT</div>
+        </div>
+        <div style="padding:13px 14px;border:1px solid #25292F;border-radius:10px;background:#121418">
+          <div style="font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#6B727C">TYPE</div>
+          <div style="margin-top:8px;font:600 14px/1.3 'IBM Plex Sans',sans-serif">IBM Plex Sans / Mono</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="1a" data-screen-label="Foundations" style="display:flex;flex-direction:column;gap:18px;padding-top:34px;border-top:1px solid #25292F">
+    <div style="display:flex;align-items:baseline;gap:12px">
+      <div style="font:600 11px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#0B0C0E;background:#6EA6EF;padding:6px 8px;border-radius:5px">1a</div>
+      <h2 style="margin:0;font:600 24px/1 'IBM Plex Sans',sans-serif;letter-spacing:-.02em">Visual direction &amp; tokens</h2>
+    </div>
+    <div style="display:grid;grid-template-columns:minmax(420px,1fr) minmax(420px,1fr) minmax(360px,.85fr);gap:14px;align-items:start">
+
+      <div style="padding:20px;border:1px solid #25292F;border-radius:12px;background:#121418">
+        <div style="font:600 11px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#6B727C">COLOR — DARK (DEFAULT)</div>
+        <div style="display:flex;flex-direction:column;gap:1px;margin-top:16px;border:1px solid #25292F;border-radius:8px;overflow:hidden">
+          <sc-for list="{{ darkTokens }}" as="t" hint-placeholder-count="10">
+            <div style="display:flex;align-items:center;gap:12px;padding:9px 12px;background:#0F1114">
+              <div style="{{ t.swatch }}"></div>
+              <div style="flex:1;font:500 12px/1 'IBM Plex Mono',monospace;color:#9BA2AB">{{ t.name }}</div>
+              <div style="font:400 11.5px/1 'IBM Plex Mono',monospace;color:#6B727C">{{ t.hex }}</div>
+              <div style="width:118px;text-align:right;font:400 10.5px/1 'IBM Plex Sans',sans-serif;color:#565C64">{{ t.use }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="padding:20px;border:1px solid #DEDED8;border-radius:12px;background:#FFFFFF">
+        <div style="font:600 11px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#878D95">COLOR — LIGHT</div>
+        <div style="display:flex;flex-direction:column;gap:1px;margin-top:16px;border:1px solid #DEDED8;border-radius:8px;overflow:hidden">
+          <sc-for list="{{ lightTokens }}" as="t" hint-placeholder-count="10">
+            <div style="display:flex;align-items:center;gap:12px;padding:9px 12px;background:#F7F7F5">
+              <div style="{{ t.swatch }}"></div>
+              <div style="flex:1;font:500 12px/1 'IBM Plex Mono',monospace;color:#565C64">{{ t.name }}</div>
+              <div style="font:400 11.5px/1 'IBM Plex Mono',monospace;color:#878D95">{{ t.hex }}</div>
+              <div style="width:118px;text-align:right;font:400 10.5px/1 'IBM Plex Sans',sans-serif;color:#878D95">{{ t.use }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div style="padding:20px;border:1px solid #25292F;border-radius:12px;background:#121418">
+          <div style="font:600 11px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#6B727C">TYPE</div>
+          <div style="margin-top:14px;display:flex;flex-direction:column;gap:12px">
+            <div style="display:flex;align-items:baseline;gap:14px;padding-bottom:12px;border-bottom:1px solid #1D2126">
+              <div style="font:700 26px/1 'IBM Plex Sans',sans-serif;letter-spacing:-.02em">Display 26/700</div>
+              <div style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#6B727C">screen titles</div>
+            </div>
+            <div style="display:flex;align-items:baseline;gap:14px;padding-bottom:12px;border-bottom:1px solid #1D2126">
+              <div style="font:600 19px/1 'IBM Plex Sans',sans-serif;letter-spacing:-.01em">Device 19/600</div>
+              <div style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#6B727C">model name</div>
+            </div>
+            <div style="display:flex;align-items:baseline;gap:14px;padding-bottom:12px;border-bottom:1px solid #1D2126">
+              <div style="font:500 12px/1 'IBM Plex Sans',sans-serif">Body 12/500 · control labels</div>
+            </div>
+            <div style="display:flex;align-items:baseline;gap:14px;padding-bottom:12px;border-bottom:1px solid #1D2126">
+              <div style="font:600 11px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#9BA2AB">SECTION 11/600 · 0.14EM</div>
+            </div>
+            <div style="display:flex;align-items:baseline;gap:14px">
+              <div style="font:600 22px/1 'IBM Plex Mono',monospace">78% −10 +5 dB</div>
+              <div style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#6B727C">all numerics: Plex Mono, tabular</div>
+            </div>
+          </div>
+        </div>
+        <div style="padding:20px;border:1px solid #25292F;border-radius:12px;background:#121418">
+          <div style="font:600 11px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#6B727C">SPACE · RADIUS · MOTION</div>
+          <div style="margin-top:14px;display:flex;flex-direction:column;gap:9px;font:400 12px/1.5 'IBM Plex Mono',monospace;color:#9BA2AB">
+            <div>space  4 · 8 · 12 · 14 · 20 · 28  (4px base)</div>
+            <div>radius  card 12 · control 10 · chip 7 · thumb pill</div>
+            <div>border  1px #25292F — no shadows on surfaces</div>
+            <div>motion  state 160ms ease · drag 100ms linear</div>
+            <div>focus   2px ring rgba(110,166,239,.55), offset 0</div>
+            <div>elev    thumbs only: 0 1px 3px rgba(0,0,0,.6)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="1b" data-screen-label="Connect states" style="display:flex;flex-direction:column;gap:18px;padding-top:34px;border-top:1px solid #25292F">
+    <div style="display:flex;align-items:baseline;gap:12px">
+      <div style="font:600 11px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#0B0C0E;background:#6EA6EF;padding:6px 8px;border-radius:5px">1b</div>
+      <h2 style="margin:0;font:600 24px/1 'IBM Plex Sans',sans-serif;letter-spacing:-.02em">Connect / empty state</h2>
+      <div style="font:400 12px/1 'IBM Plex Mono',monospace;color:#6B727C">900 × 640 · idle → connecting → failed · unsupported browser</div>
+    </div>
+    <div style="display:flex;gap:20px;flex-wrap:wrap">
+
+      <div style="display:flex;flex-direction:column;gap:9px">
+        <div style="font:500 11px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#6B727C">IDLE — NO DEVICE</div>
+        <div style="width:900px;height:640px;border:1px solid #25292F;border-radius:12px;overflow:hidden;background:#0B0C0E;display:flex;flex-direction:column">
+          <div style="height:44px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 14px;border-bottom:1px solid #25292F;background:#121418">
+            <div style="display:flex;gap:7px"><div style="width:11px;height:11px;border-radius:50%;background:#2E3238"></div><div style="width:11px;height:11px;border-radius:50%;background:#2E3238"></div><div style="width:11px;height:11px;border-radius:50%;background:#2E3238"></div></div>
+            <div style="display:flex;align-items:center;gap:8px"><div style="width:9px;height:9px;border-radius:50%;background:#6B727C"></div><div style="font:600 11px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#9BA2AB">NULLPOINT</div></div>
+            <div style="font:500 11px/1 'IBM Plex Sans',sans-serif;color:#6B727C;padding:6px 8px">Settings</div>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;padding:0 80px">
+            <div style="width:96px;height:96px;border-radius:16px;border:1px solid #25292F;background-color:#131519;background-image:repeating-linear-gradient(135deg,transparent 0 6px,#2A2F36 6px 7px)"></div>
+            <div style="margin-top:26px;font:600 26px/1.15 'IBM Plex Sans',sans-serif;letter-spacing:-.02em;color:#E7E9EC">No headphones connected</div>
+            <div style="margin-top:12px;max-width:420px;text-align:center;font:400 13.5px/1.6 'IBM Plex Sans',sans-serif;color:#9BA2AB;text-wrap:pretty">Nullpoint controls headphones that are already paired in your system Bluetooth settings. It never handles audio — playback stays with your OS.</div>
+            <div style="margin-top:26px;padding:13px 26px;border-radius:9px;background:#6EA6EF;color:#0B0C0E;font:600 14px/1 'IBM Plex Sans',sans-serif;cursor:pointer">Connect headphones</div>
+            <div style="margin-top:14px;font:400 11px/1 'IBM Plex Mono',monospace;color:#6B727C">OPENS THE SYSTEM DEVICE PICKER · ⌘K</div>
+            <div style="margin-top:40px;width:100%;max-width:520px;display:flex;gap:10px;padding:14px;border:1px solid #25292F;border-radius:10px;background:#121418">
+              <div style="width:4px;flex:none;border-radius:2px;background:#2E3238"></div>
+              <div>
+                <div style="font:500 12px/1.4 'IBM Plex Sans',sans-serif;color:#9BA2AB">Not seeing your headphones?</div>
+                <div style="margin-top:6px;font:400 11.5px/1.6 'IBM Plex Mono',monospace;color:#6B727C">1 · PAIR THEM IN SYSTEM BLUETOOTH FIRST<br />2 · TAKE THEM OUT OF THE CASE / POWER ON<br />3 · CLOSE THE PHONE APP — ONE CONTROLLER AT A TIME</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:9px">
+        <div style="font:500 11px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#6B727C">CONNECTING</div>
+        <div style="width:900px;height:640px;border:1px solid #25292F;border-radius:12px;overflow:hidden;background:#0B0C0E;display:flex;flex-direction:column">
+          <div style="height:44px;flex:none;display:flex;align-items:center;justify-content:center;border-bottom:1px solid #25292F;background:#121418">
+            <div style="display:flex;align-items:center;gap:8px"><div style="width:9px;height:9px;border-radius:50%;background:#6EA6EF;animation:np-pulse 1.4s ease-in-out infinite"></div><div style="font:600 11px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#9BA2AB">NULLPOINT</div></div>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 80px">
+            <div style="position:relative;width:96px;height:96px">
+              <div style="position:absolute;inset:0;border-radius:50%;border:2px solid #1D2126"></div>
+              <div style="position:absolute;inset:0;border-radius:50%;border:2px solid transparent;border-top-color:#6EA6EF;animation:np-spin 1s linear infinite"></div>
+              <div style="position:absolute;inset:22px;border-radius:12px;border:1px solid #25292F;background-color:#131519;background-image:repeating-linear-gradient(135deg,transparent 0 6px,#2A2F36 6px 7px)"></div>
+            </div>
+            <div style="margin-top:26px;font:600 22px/1.2 'IBM Plex Sans',sans-serif;letter-spacing:-.02em">Connecting to WH-1000XM6</div>
+            <div style="margin-top:14px;display:flex;flex-direction:column;gap:9px;width:100%;max-width:340px">
+              <sc-for list="{{ connectSteps }}" as="s" hint-placeholder-count="3">
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div style="{{ s.dot }}"></div>
+                  <div style="{{ s.text }}">{{ s.label }}</div>
+                  <div style="flex:1;height:1px;background:#1D2126"></div>
+                  <div style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#6B727C">{{ s.status }}</div>
+                </div>
+              </sc-for>
+            </div>
+            <div style="margin-top:30px;padding:10px 20px;border:1px solid #25292F;border-radius:8px;font:500 12.5px/1 'IBM Plex Sans',sans-serif;color:#9BA2AB;cursor:pointer">Cancel</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:9px">
+        <div style="font:500 11px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#6B727C">CONNECTION FAILED</div>
+        <div style="width:900px;height:640px;border:1px solid #25292F;border-radius:12px;overflow:hidden;background:#0B0C0E;display:flex;flex-direction:column">
+          <div style="height:44px;flex:none;display:flex;align-items:center;justify-content:center;border-bottom:1px solid #25292F;background:#121418">
+            <div style="display:flex;align-items:center;gap:8px"><div style="width:9px;height:9px;border-radius:50%;background:#E58A6B"></div><div style="font:600 11px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#9BA2AB">NULLPOINT</div></div>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 80px">
+            <div style="width:96px;height:96px;border-radius:16px;border:1px solid rgba(229,138,107,.4);background:rgba(229,138,107,.07);display:flex;align-items:center;justify-content:center">
+              <div style="width:3px;height:44px;border-radius:2px;background:#E58A6B"></div>
+            </div>
+            <div style="margin-top:26px;font:600 22px/1.2 'IBM Plex Sans',sans-serif;letter-spacing:-.02em;color:#E7E9EC">Couldn't reach WH-1000XM6</div>
+            <div style="margin-top:12px;max-width:440px;text-align:center;font:400 13px/1.6 'IBM Plex Sans',sans-serif;color:#9BA2AB;text-wrap:pretty">The device answered pairing but closed the control link. This usually means another app — often Sound Connect on your phone — holds the session.</div>
+            <div style="margin-top:12px;font:400 11px/1 'IBM Plex Mono',monospace;color:#6B727C">GATT_ERR 0x0E · TIMEOUT AFTER 8.0S</div>
+            <div style="margin-top:26px;display:flex;gap:10px">
+              <div style="padding:12px 24px;border-radius:9px;background:#6EA6EF;color:#0B0C0E;font:600 13.5px/1 'IBM Plex Sans',sans-serif;cursor:pointer">Retry</div>
+              <div style="padding:12px 20px;border-radius:9px;border:1px solid #25292F;color:#9BA2AB;font:500 13.5px/1 'IBM Plex Sans',sans-serif;cursor:pointer">Choose another device</div>
+            </div>
+            <div style="margin-top:16px;font:500 11.5px/1 'IBM Plex Sans',sans-serif;color:#6EA6EF;cursor:pointer">View troubleshooting log</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:9px">
+        <div style="font:500 11px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#6B727C">WEB — UNSUPPORTED BROWSER</div>
+        <div style="width:900px;height:640px;border:1px solid #25292F;border-radius:12px;overflow:hidden;background:#0B0C0E;display:flex;flex-direction:column">
+          <div style="height:44px;flex:none;display:flex;align-items:center;gap:10px;padding:0 14px;border-bottom:1px solid #25292F;background:#121418">
+            <div style="display:flex;gap:7px"><div style="width:11px;height:11px;border-radius:50%;background:#2E3238"></div><div style="width:11px;height:11px;border-radius:50%;background:#2E3238"></div><div style="width:11px;height:11px;border-radius:50%;background:#2E3238"></div></div>
+            <div style="flex:1;height:24px;border-radius:6px;background:#0F1114;border:1px solid #25292F;display:flex;align-items:center;padding:0 10px;font:400 11px/1 'IBM Plex Mono',monospace;color:#6B727C">app.nullpoint.audio</div>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 80px">
+            <div style="font:600 22px/1.25 'IBM Plex Sans',sans-serif;letter-spacing:-.02em;text-align:center;max-width:520px;text-wrap:pretty">This browser can't talk to Bluetooth devices</div>
+            <div style="margin-top:12px;max-width:460px;text-align:center;font:400 13px/1.6 'IBM Plex Sans',sans-serif;color:#9BA2AB;text-wrap:pretty">The web version needs the Web Bluetooth API, available in Chrome, Edge, Opera and Arc on desktop. Safari and Firefox don't implement it.</div>
+            <div style="margin-top:24px;display:grid;grid-template-columns:repeat(4,120px);gap:8px">
+              <sc-for list="{{ browsers }}" as="b" hint-placeholder-count="4">
+                <div style="{{ b.box }}">
+                  <div style="font:500 12px/1 'IBM Plex Sans',sans-serif">{{ b.name }}</div>
+                  <div style="font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:.08em;opacity:.75">{{ b.status }}</div>
+                </div>
+              </sc-for>
+            </div>
+            <div style="margin-top:28px;display:flex;gap:10px">
+              <div style="padding:12px 22px;border-radius:9px;background:#6EA6EF;color:#0B0C0E;font:600 13.5px/1 'IBM Plex Sans',sans-serif;cursor:pointer">Copy link for Chrome</div>
+              <div style="padding:12px 20px;border-radius:9px;border:1px solid #25292F;color:#9BA2AB;font:500 13.5px/1 'IBM Plex Sans',sans-serif;cursor:pointer">Download desktop app</div>
+            </div>
+            <div style="margin-top:36px;padding:12px 16px;border:1px dashed #25292F;border-radius:9px;font:400 11px/1.6 'IBM Plex Mono',monospace;color:#6B727C;text-align:center">READ-ONLY DEMO MODE IS AVAILABLE HERE — CONTROLS ARE DISABLED<br />AND VALUES ARE SAMPLE DATA.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="1c" data-screen-label="Dashboard" style="display:flex;flex-direction:column;gap:18px;padding-top:34px;border-top:1px solid #25292F">
+    <div style="display:flex;align-items:baseline;gap:12px">
+      <div style="font:600 11px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#0B0C0E;background:#6EA6EF;padding:6px 8px;border-radius:5px">1c</div>
+      <h2 style="margin:0;font:600 24px/1 'IBM Plex Sans',sans-serif;letter-spacing:-.02em">Main dashboard</h2>
+      <div style="font:400 12px/1 'IBM Plex Mono',monospace;color:#6B727C">LIVE — DRAG THE SLIDERS, TAB THROUGH THE CONTROLS</div>
+    </div>
+    <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start">
+      <div style="display:flex;flex-direction:column;gap:9px">
+        <div style="font:500 11px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#6B727C">CONNECTED — DARK (DEFAULT)</div>
+        <div style="width:900px;height:640px;border:1px solid #25292F;border-radius:12px;overflow:hidden;display:flex">
+          <dc-import name="Dashboard" theme="dark" style="width:100%;height:100%" hint-size="900px,640px"></dc-import>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:9px">
+        <div style="font:500 11px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#6B727C">CONNECTED — LIGHT</div>
+        <div style="width:900px;height:640px;border:1px solid #DEDED8;border-radius:12px;overflow:hidden;display:flex">
+          <dc-import name="Dashboard" theme="light" style="width:100%;height:100%" hint-size="900px,640px"></dc-import>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:9px">
+        <div style="font:500 11px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#E58A6B">BATTERY LOW + RECONNECTING</div>
+        <div style="width:900px;height:640px;border:1px solid #25292F;border-radius:12px;overflow:hidden;display:flex">
+          <dc-import name="Dashboard" theme="dark" low-battery="{{ yes }}" reconnecting="{{ yes }}" style="width:100%;height:100%" hint-size="900px,640px"></dc-import>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:9px">
+        <div style="font:500 11px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#6B727C">CHANGED ON DEVICE + UNSUPPORTED FEATURE</div>
+        <div style="width:900px;height:640px;border:1px solid #25292F;border-radius:12px;overflow:hidden;display:flex">
+          <dc-import name="Dashboard" theme="dark" synced-from-device="{{ yes }}" unsupported-features="{{ yes }}" style="width:100%;height:100%" hint-size="900px,640px"></dc-import>
+        </div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;max-width:1840px">
+      <sc-for list="{{ stateNotes }}" as="n" hint-placeholder-count="4">
+        <div style="padding:15px 16px;border:1px solid #25292F;border-radius:10px;background:#121418">
+          <div style="font:600 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;color:{{ n.color }}">{{ n.title }}</div>
+          <div style="margin-top:9px;font:400 12.5px/1.55 'IBM Plex Sans',sans-serif;color:#9BA2AB;text-wrap:pretty">{{ n.body }}</div>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+
+  <section id="1d" data-screen-label="Tray + Settings" style="display:flex;flex-direction:column;gap:18px;padding-top:34px;border-top:1px solid #25292F">
+    <div style="display:flex;align-items:baseline;gap:12px">
+      <div style="font:600 11px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#0B0C0E;background:#6EA6EF;padding:6px 8px;border-radius:5px">1d</div>
+      <h2 style="margin:0;font:600 24px/1 'IBM Plex Sans',sans-serif;letter-spacing:-.02em">Tray popover &amp; settings</h2>
+      <div style="font:400 12px/1 'IBM Plex Mono',monospace;color:#6B727C">320 × 420 · 900 × 640</div>
+    </div>
+    <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start">
+
+      <div style="display:flex;flex-direction:column;gap:9px">
+        <div style="font:500 11px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#6B727C">TRAY — CONNECTED</div>
+        <div style="width:320px;height:420px;border:1px solid #25292F;border-radius:12px;background:#0B0C0E;overflow:hidden;display:flex;flex-direction:column">
+          <div style="flex:none;padding:16px 16px 14px;border-bottom:1px solid #25292F;display:flex;align-items:center;gap:12px">
+            <div style="width:38px;height:38px;flex:none;border-radius:8px;border:1px solid #25292F;background-color:#191C21;background-image:repeating-linear-gradient(135deg,transparent 0 5px,#2A2F36 5px 6px)"></div>
+            <div style="flex:1;min-width:0">
+              <div style="font:600 13.5px/1.2 'IBM Plex Sans',sans-serif;color:#E7E9EC">WH-1000XM6</div>
+              <div style="margin-top:4px;font:400 10px/1 'IBM Plex Mono',monospace;letter-spacing:.06em;color:#7FC29B">LINKED · LDAC</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font:600 17px/1 'IBM Plex Mono',monospace;color:#E7E9EC">78%</div>
+              <div style="margin-top:4px;font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:.08em;color:#6B727C">24H</div>
+            </div>
+          </div>
+          <div style="flex:1;padding:14px 16px;display:flex;flex-direction:column;gap:12px">
+            <div style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#6B727C">NOISE CONTROL</div>
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <div style="display:flex;align-items:center;gap:10px;height:40px;padding:0 12px;border-radius:8px;background:rgba(110,166,239,.14);border:1px solid #6EA6EF">
+                <div style="width:6px;height:6px;border-radius:50%;background:#6EA6EF"></div>
+                <div style="flex:1;font:600 12.5px/1 'IBM Plex Sans',sans-serif;color:#6EA6EF">Noise Canceling</div>
+                <div style="font:400 9.5px/1 'IBM Plex Mono',monospace;color:#6EA6EF">ANC</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;height:40px;padding:0 12px;border-radius:8px;border:1px solid transparent">
+                <div style="width:6px;height:6px;border-radius:50%;background:#2E3238"></div>
+                <div style="flex:1;font:500 12.5px/1 'IBM Plex Sans',sans-serif;color:#9BA2AB">Ambient Sound</div>
+                <div style="font:400 9.5px/1 'IBM Plex Mono',monospace;color:#6B727C">12/20</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;height:40px;padding:0 12px;border-radius:8px;border:1px solid transparent">
+                <div style="width:6px;height:6px;border-radius:50%;background:#2E3238"></div>
+                <div style="flex:1;font:500 12.5px/1 'IBM Plex Sans',sans-serif;color:#9BA2AB">Off</div>
+              </div>
+            </div>
+            <div style="height:1px;background:#1D2126"></div>
+            <div style="display:flex;align-items:center;gap:11px">
+              <div style="width:34px;height:34px;flex:none;border-radius:6px;border:1px solid #25292F;background-color:#191C21;background-image:repeating-linear-gradient(135deg,transparent 0 4px,#2A2F36 4px 5px)"></div>
+              <div style="min-width:0;flex:1">
+                <div style="font:500 12px/1.2 'IBM Plex Sans',sans-serif;color:#E7E9EC;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Sonata in Grey</div>
+                <div style="margin-top:3px;font:400 10px/1.2 'IBM Plex Mono',monospace;color:#6B727C;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Hollow Field</div>
+              </div>
+              <div style="font:400 10px/1 'IBM Plex Mono',monospace;color:#6B727C">61 dB</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:9px">
+              <div style="font:500 9.5px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#6B727C">EQ</div>
+              <div style="flex:1;font:500 11.5px/1 'IBM Plex Sans',sans-serif;color:#9BA2AB">Custom</div>
+              <div style="font:400 10px/1 'IBM Plex Mono',monospace;color:#6B727C">+3 +2 0 −2 +3 +5</div>
+            </div>
+          </div>
+          <div style="flex:none;padding:11px 16px;border-top:1px solid #25292F;display:flex;align-items:center;justify-content:space-between;background:#121418">
+            <div style="font:500 11.5px/1 'IBM Plex Sans',sans-serif;color:#6EA6EF;cursor:pointer">Open Nullpoint</div>
+            <div style="font:400 10px/1 'IBM Plex Mono',monospace;color:#6B727C">⌥⇧N</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:9px">
+        <div style="font:500 11px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#6B727C">TRAY — DISCONNECTED</div>
+        <div style="width:320px;height:420px;border:1px solid #25292F;border-radius:12px;background:#0B0C0E;overflow:hidden;display:flex;flex-direction:column">
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 28px;text-align:center">
+            <div style="width:56px;height:56px;border-radius:12px;border:1px solid #25292F;background-color:#131519;background-image:repeating-linear-gradient(135deg,transparent 0 5px,#2A2F36 5px 6px);opacity:.6"></div>
+            <div style="margin-top:18px;font:600 14px/1.3 'IBM Plex Sans',sans-serif;color:#E7E9EC">WH-1000XM6 is offline</div>
+            <div style="margin-top:8px;font:400 11.5px/1.55 'IBM Plex Sans',sans-serif;color:#6B727C;text-wrap:pretty">Last seen 14 minutes ago at 78%. Nullpoint will reconnect automatically when it powers on.</div>
+            <div style="margin-top:18px;padding:10px 18px;border-radius:8px;border:1px solid #25292F;font:500 12px/1 'IBM Plex Sans',sans-serif;color:#9BA2AB;cursor:pointer">Try now</div>
+          </div>
+          <div style="flex:none;padding:11px 16px;border-top:1px solid #25292F;display:flex;align-items:center;justify-content:space-between;background:#121418">
+            <div style="font:500 11.5px/1 'IBM Plex Sans',sans-serif;color:#6EA6EF;cursor:pointer">Open Nullpoint</div>
+            <div style="font:400 10px/1 'IBM Plex Mono',monospace;color:#6B727C">QUIT</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:9px">
+        <div style="font:500 11px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#6B727C">SETTINGS / ABOUT</div>
+        <div style="width:900px;height:640px;border:1px solid #25292F;border-radius:12px;overflow:hidden;background:#0B0C0E;display:flex;flex-direction:column">
+          <div style="height:44px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 14px;border-bottom:1px solid #25292F;background:#121418">
+            <div style="display:flex;gap:7px"><div style="width:11px;height:11px;border-radius:50%;background:#2E3238"></div><div style="width:11px;height:11px;border-radius:50%;background:#2E3238"></div><div style="width:11px;height:11px;border-radius:50%;background:#2E3238"></div></div>
+            <div style="font:600 11px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#9BA2AB">SETTINGS</div>
+            <div style="font:500 11px/1 'IBM Plex Sans',sans-serif;color:#6EA6EF;padding:6px 8px;cursor:pointer">Done</div>
+          </div>
+          <div style="flex:1;display:flex;min-height:0">
+            <div style="width:190px;flex:none;border-right:1px solid #25292F;background:#0F1114;padding:14px 10px;display:flex;flex-direction:column;gap:2px">
+              <sc-for list="{{ settingsNav }}" as="n" hint-placeholder-count="4">
+                <div style="{{ n.style }}">{{ n.label }}</div>
+              </sc-for>
+            </div>
+            <div style="flex:1;min-width:0;overflow:hidden;padding:20px 24px;display:flex;flex-direction:column;gap:18px">
+              <div style="font:600 11px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#6B727C">GENERAL</div>
+              <div style="flex:none;display:flex;flex-direction:column;border:1px solid #25292F;border-radius:10px;overflow:hidden">
+                <sc-for list="{{ settingsRows }}" as="r" hint-placeholder-count="5">
+                  <div style="{{ r.row }}">
+                    <div style="flex:1;min-width:0">
+                      <div style="font:500 13px/1.3 'IBM Plex Sans',sans-serif;color:#E7E9EC">{{ r.label }}</div>
+                      <div style="margin-top:4px;font:400 11px/1.4 'IBM Plex Mono',monospace;color:#6B727C">{{ r.hint }}</div>
+                    </div>
+                    <div style="{{ r.controlStyle }}">{{ r.control }}<div style="{{ r.knobStyle }}"></div></div>
+                  </div>
+                </sc-for>
+              </div>
+              <div style="font:600 11px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#6B727C">ABOUT</div>
+              <div style="padding:16px 18px;border:1px solid #25292F;border-radius:10px;background:#121418">
+                <div style="display:flex;align-items:center;gap:9px">
+                  <div style="width:11px;height:11px;border-radius:50%;background:#6EA6EF"></div>
+                  <div style="font:600 12px/1 'IBM Plex Mono',monospace;letter-spacing:.24em;color:#E7E9EC">NULLPOINT</div>
+                  <div style="font:400 11px/1 'IBM Plex Mono',monospace;color:#6B727C">0.9.2 · MIT</div>
+                </div>
+                <div style="margin-top:12px;font:400 12px/1.65 'IBM Plex Sans',sans-serif;color:#9BA2AB;max-width:520px;text-wrap:pretty">Nullpoint is an independent, community-built client. It is not affiliated with, endorsed by, or connected to Sony Group Corporation. Model names are used solely to identify compatible hardware. Protocol support is derived from public reverse-engineering work; features may break after firmware updates.</div>
+                <div style="margin-top:14px;display:flex;gap:16px;font:500 11.5px/1 'IBM Plex Sans',sans-serif">
+                  <a href="#1a">Source &amp; licenses</a>
+                  <a href="#1a">Report a device</a>
+                  <a href="#1a">Protocol credits</a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="1e" data-screen-label="Component specs" style="display:flex;flex-direction:column;gap:18px;padding-top:34px;border-top:1px solid #25292F">
+    <div style="display:flex;align-items:baseline;gap:12px">
+      <div style="font:600 11px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#0B0C0E;background:#6EA6EF;padding:6px 8px;border-radius:5px">1e</div>
+      <h2 style="margin:0;font:600 24px/1 'IBM Plex Sans',sans-serif;letter-spacing:-.02em">Component specs</h2>
+      <div style="font:400 12px/1 'IBM Plex Mono',monospace;color:#6B727C">IMPLEMENTATION-READY</div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,minmax(560px,1fr));gap:16px;align-items:start">
+      <sc-for list="{{ specs }}" as="s" hint-placeholder-count="3">
+        <div style="display:flex;flex-direction:column;gap:16px;padding:20px;border:1px solid #25292F;border-radius:12px;background:#121418">
+          <div>
+            <div style="font:600 16px/1.2 'IBM Plex Sans',sans-serif;color:#E7E9EC">{{ s.name }}</div>
+            <div style="margin-top:6px;font:400 12.5px/1.55 'IBM Plex Sans',sans-serif;color:#9BA2AB;text-wrap:pretty">{{ s.intent }}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <div style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#6B727C">GEOMETRY</div>
+            <sc-for list="{{ s.geometry }}" as="g" hint-placeholder-count="5">
+              <div style="display:flex;gap:12px;font:400 11.5px/1.5 'IBM Plex Mono',monospace">
+                <div style="width:104px;flex:none;color:#6B727C">{{ g.k }}</div>
+                <div style="color:#9BA2AB">{{ g.v }}</div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <div style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#6B727C">STATES</div>
+            <sc-for list="{{ s.states }}" as="st" hint-placeholder-count="5">
+              <div style="display:flex;gap:12px;font:400 11.5px/1.5 'IBM Plex Mono',monospace">
+                <div style="width:104px;flex:none;color:#6B727C">{{ st.k }}</div>
+                <div style="color:#9BA2AB">{{ st.v }}</div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <div style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#6B727C">KEYBOARD &amp; A11Y</div>
+            <sc-for list="{{ s.keys }}" as="k" hint-placeholder-count="4">
+              <div style="display:flex;gap:12px;font:400 11.5px/1.5 'IBM Plex Mono',monospace">
+                <div style="width:104px;flex:none;color:#6B727C">{{ k.k }}</div>
+                <div style="color:#9BA2AB">{{ k.v }}</div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="padding:14px;border-radius:9px;background:#0F1114;border:1px solid #25292F;font:400 11.5px/1.65 'IBM Plex Mono',monospace;color:#9BA2AB;white-space:pre-wrap">{{ s.api }}</div>
+        </div>
+      </sc-for>
+    </div>
+    <div style="padding:20px;border:1px solid #25292F;border-radius:12px;background:#121418;max-width:1840px">
+      <div style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#6B727C">SHARED RULES</div>
+      <div style="margin-top:14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px">
+        <sc-for list="{{ rules }}" as="r" hint-placeholder-count="4">
+          <div>
+            <div style="font:600 12.5px/1.3 'IBM Plex Sans',sans-serif;color:#E7E9EC">{{ r.t }}</div>
+            <div style="margin-top:6px;font:400 12px/1.6 'IBM Plex Sans',sans-serif;color:#9BA2AB;text-wrap:pretty">{{ r.d }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{}">
+const sw = (hex, border) => ({ width:'26px', height:'26px', flex:'none', borderRadius:'6px', background:hex, border:'1px solid ' + (border || 'rgba(255,255,255,.08)') });
+
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      yes: true,
+      darkTokens: [
+        ['bg','#0B0C0E','app canvas'], ['surface','#121418','cards, bars'], ['surface-2','#191C21','inset groups'],
+        ['line','#25292F','1px borders'], ['track','#1D2126','slider tracks'], ['text','#E7E9EC','primary'],
+        ['text-2','#9BA2AB','labels'], ['text-3','#6B727C','meta, mono'], ['accent','#6EA6EF','ANC, focus, links'],
+        ['ambient','#E0A15C','ambient mode only'], ['ok','#7FC29B','linked, battery'], ['warn','#E58A6B','low batt, errors']
+      ].map(([name,hex,use]) => ({ name, hex, use, swatch: sw(hex) })),
+      lightTokens: [
+        ['bg','#F4F4F2','app canvas'], ['surface','#FFFFFF','cards, bars'], ['surface-2','#EDEDEA','inset groups'],
+        ['line','#DEDED8','1px borders'], ['track','#E4E4DF','slider tracks'], ['text','#17191C','primary'],
+        ['text-2','#565C64','labels'], ['text-3','#878D95','meta, mono'], ['accent','#2C6BC9','ANC, focus, links'],
+        ['ambient','#A9701F','ambient mode only'], ['ok','#3C8A62','linked, battery'], ['warn','#B4552F','low batt, errors']
+      ].map(([name,hex,use]) => ({ name, hex, use, swatch: sw(hex, 'rgba(0,0,0,.12)') })),
+      connectSteps: [
+        ['Bluetooth link', 'OK', 'done'],
+        ['Control service (GATT)', 'OK', 'done'],
+        ['Reading device state', '···', 'active'],
+        ['Syncing EQ + noise profile', 'WAIT', 'idle']
+      ].map(([label, status, kind]) => ({
+        label, status,
+        dot: { width:'7px', height:'7px', flex:'none', borderRadius:'50%',
+          background: kind === 'idle' ? '#2E3238' : kind === 'active' ? '#6EA6EF' : '#7FC29B',
+          animation: kind === 'active' ? 'np-pulse 1.2s ease-in-out infinite' : 'none' },
+        text: { font:"500 12px/1 'IBM Plex Sans', sans-serif", color: kind === 'idle' ? '#6B727C' : '#E7E9EC' }
+      })),
+      browsers: [
+        ['Chrome','SUPPORTED',true], ['Edge','SUPPORTED',true], ['Safari','NO API',false], ['Firefox','NO API',false]
+      ].map(([name,status,ok]) => ({ name, status, box: {
+        display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:'6px',
+        height:'62px', borderRadius:'9px',
+        border:'1px solid ' + (ok ? 'rgba(127,194,155,.35)' : '#25292F'),
+        background: ok ? 'rgba(127,194,155,.07)' : 'transparent',
+        color: ok ? '#7FC29B' : '#6B727C'
+      }})),
+      stateNotes: [
+        { title:'DEVICE CHANGED EXTERNALLY', color:'#6EA6EF', body:'When a value arrives from the headphones rather than from this UI, the control animates to its new position over 220ms and an "UPDATED FROM DEVICE" tag fades in above the section for 4s. Never a toast — the change is already visible.' },
+        { title:'BATTERY LOW (≤ 15%)', color:'#E58A6B', body:'Percentage and battery glyph switch to warn; the sub-label becomes remaining runtime. No modal, no blocking. Tray icon gains a warn dot. At ≤ 5% the app warns that the link may drop mid-write.' },
+        { title:'UNSUPPORTED BY MODEL', color:'#6B727C', body:'Row drops to 45% opacity, control is aria-disabled with tabindex −1, and the hint line states the reason in mono. Hovering shows the same string as a native tooltip. Never hide the feature — absence reads as a bug.' },
+        { title:'RECONNECTING', color:'#E58A6B', body:'A banner replaces nothing and pushes content down 38px. Controls stay visible but become non-interactive at 60% opacity after 3s. Values shown are the last known state, labelled as such in the header.' }
+      ],
+      settingsNav: ['General','Device','Appearance','About'].map((label, i) => ({
+        label,
+        style: {
+          padding:'9px 11px', borderRadius:'7px',
+          font:"500 12.5px/1 'IBM Plex Sans', sans-serif",
+          color: i === 0 ? '#E7E9EC' : '#9BA2AB',
+          background: i === 0 ? '#191C21' : 'transparent',
+          cursor:'pointer'
+        }
+      })),
+      settingsRows: [
+        ['Reconnect automatically','WHEN THE DEVICE POWERS ON','on'],
+        ['Launch at login','MENU BAR ONLY, NO WINDOW','on'],
+        ['Start minimised to tray','SKIPS THE MAIN WINDOW','off'],
+        ['Theme','FOLLOWS SYSTEM BY DEFAULT','seg'],
+        ['Show sound pressure readout','ESTIMATED, NOT CALIBRATED','off']
+      ].map(([label, hint, kind], i) => ({
+        label, hint,
+        control: kind === 'seg' ? 'System · Dark · Light' : '',
+        row: {
+          display:'flex', alignItems:'center', gap:'16px', padding:'14px 16px',
+          background:'#121418',
+          borderTop: i === 0 ? 'none' : '1px solid #25292F'
+        },
+        controlStyle: kind === 'seg'
+          ? { flex:'none', padding:'7px 11px', borderRadius:'7px', border:'1px solid #25292F', font:"500 11px/1 'IBM Plex Mono', monospace", color:'#9BA2AB' }
+          : { flex:'none', position:'relative', width:'38px', height:'22px', borderRadius:'11px',
+              background: kind === 'on' ? '#6EA6EF' : '#1D2126',
+              border:'1px solid ' + (kind === 'on' ? '#6EA6EF' : '#25292F') },
+        knobStyle: kind === 'seg'
+          ? { display:'none' }
+          : { position:'absolute', top:'2px', left: kind === 'on' ? '18px' : '2px',
+              width:'16px', height:'16px', borderRadius:'50%',
+              background: kind === 'on' ? '#0B0C0E' : '#6B727C' }
+      })),
+      specs: [
+        {
+          name: 'NoiseModeSegmented',
+          intent: 'Three mutually exclusive modes in one control. Colour is never the only signal — the active segment also gains a 1px border and its label goes 600 weight.',
+          geometry: [
+            { k:'container', v:'grid 1fr 1fr 1fr, gap 3, pad 3, r10, 1px line, bg track' },
+            { k:'segment', v:'h 52, r8, label 12/600 + sub 9.5 mono uppercase' },
+            { k:'active anc', v:'bg accent@14%, border accent, text accent' },
+            { k:'active amb', v:'bg ambient@14%, border ambient, text ambient' },
+            { k:'active off', v:'bg surface-2, border text-2, text text-2' },
+            { k:'tray variant', v:'stacked rows h40, leading 6px dot, r8' }
+          ],
+          states: [
+            { k:'rest', v:'transparent, text-3' },
+            { k:'hover', v:'filter brightness(1.12), 160ms' },
+            { k:'active', v:'tint + border, no scale transform' },
+            { k:'pending', v:'write in flight: label at 60%, no spinner (<200ms)' },
+            { k:'remote', v:'device-initiated: 220ms tint cross-fade + section tag' },
+            { k:'disabled', v:'opacity .45, aria-disabled, tabindex -1' }
+          ],
+          keys: [
+            { k:'roles', v:'radiogroup > radio, aria-checked, aria-label' },
+            { k:'tab', v:'roving tabindex — only the checked segment is tabbable' },
+            { k:'← →', v:'move selection and commit immediately (wraps)' },
+            { k:'space/enter', v:'commit focused segment' },
+            { k:'sr', v:'announce "Ambient Sound, selected, 2 of 3"' }
+          ],
+          api: 'type NoiseMode = "anc" | "ambient" | "off"\n\n<NoiseModeSegmented\n  value={mode}\n  onChange={(m: NoiseMode) => void}\n  origin="local" | "device"\n  disabled?: NoiseMode[]\n  variant="window" | "tray"\n/>'
+        },
+        {
+          name: 'AmbientLevelSlider',
+          intent: 'Integer 0–20, shown numerically at all times. The whole group dims to 38% and turns off pointer events when the mode is not Ambient — it stays laid out so the panel never reflows.',
+          geometry: [
+            { k:'group', v:'r10, pad 13, bg surface-2, 1px line, gap 8' },
+            { k:'track', v:'h6 r3 bg track, full width, hit area h26' },
+            { k:'fill', v:'ambient, from 0 to value' },
+            { k:'thumb', v:'16 circle, ambient, 3px surface-2 ring' },
+            { k:'scale', v:'0 SEALED / 10 / 20 OPEN, 9.5 mono text-3' },
+            { k:'value', v:'"AUTO · 12 / 20" 13 mono 600, top-right' }
+          ],
+          states: [
+            { k:'inactive', v:'mode ≠ ambient → opacity .38, pointer-events none' },
+            { k:'drag', v:'pointer capture, 100ms linear, snaps to integers' },
+            { k:'auto on', v:'value prefixed AUTO; any drag clears auto' },
+            { k:'throttle', v:'writes coalesced to 1 per 120ms, final value always sent' },
+            { k:'remote', v:'thumb eases 220ms; drag in progress wins' }
+          ],
+          keys: [
+            { k:'role', v:'slider, aria-valuemin/max/now, aria-label' },
+            { k:'↑ ↓ ← →', v:'±1' },
+            { k:'pgup/pgdn', v:'±5' },
+            { k:'home/end', v:'0 / 20' },
+            { k:'focus', v:'2px accent ring on the 26px hit area' }
+          ],
+          api: '<AmbientLevelSlider\n  value={0..20}\n  auto={boolean}\n  onChange={(v: number) => void}\n  onAutoChange={(b: boolean) => void}\n  active={mode === "ambient"}\n/>\n\n// focus-on-voice is a sibling Switch,\n// disabled when caps.voicePassthrough === false'
+        },
+        {
+          name: 'EqualizerPanel',
+          intent: 'Five bands plus Clear Bass, −10…+10 dB integers. Presets write band values and lock the sliders; only Custom is editable. Values are always printed above each band.',
+          geometry: [
+            { k:'presets', v:'chip row, r7, pad 6/11, 11.5/500, wraps' },
+            { k:'band col', v:'flex 1, gap 8, value → track → label' },
+            { k:'track', v:'w max 34, flex-1 min-h 96, r8, bg track, 1px line' },
+            { k:'zero line', v:'1px line at 50%, inset 6px' },
+            { k:'fill', v:'accent @32%, from centre to value' },
+            { k:'thumb', v:'h10 pill, inset 3px, accent, shadow' },
+            { k:'labels', v:'CLEAR BASS · 400 · 1k · 2.5k · 6.3k · 16k' }
+          ],
+          states: [
+            { k:'preset', v:'non-Custom: opacity .5, cursor not-allowed, tabindex -1' },
+            { k:'custom', v:'full opacity, ns-resize, keyboard enabled' },
+            { k:'drag', v:'vertical pointer capture, rounds to 1 dB' },
+            { k:'edit', v:'editing a band while a preset is active switches to Custom' },
+            { k:'remote', v:'all six thumbs ease 220ms together' }
+          ],
+          keys: [
+            { k:'role', v:'slider per band, aria-label "6.3 kilohertz band"' },
+            { k:'↑ ↓', v:'±1 dB' },
+            { k:'pgup/pgdn', v:'±5 dB' },
+            { k:'home/end', v:'−10 / +10' },
+            { k:'sr value', v:'aria-valuetext "+5 decibels"' }
+          ],
+          api: 'type Preset = "Heavy"|"Clear"|"Hard"|"Soft"|"Custom"\ntype Bands = { cb:number; b1:number; b2:number;\n  b3:number; b4:number; b5:number }\n\n<EqualizerPanel\n  preset={Preset}\n  bands={Bands}\n  onPresetChange={(p) => void}\n  onBandChange={(id, dB) => void}\n/>'
+        }
+      ],
+      rules: [
+        { t:'Optimistic, reconciled', d:'Every control paints its new value immediately, then reconciles with the device notification. If the write fails the control eases back and the section tag reads FAILED — DEVICE UNCHANGED.' },
+        { t:'Values are text', d:'No control communicates state by colour alone. Every slider prints its number, every mode prints its label, every disabled row prints its reason.' },
+        { t:'One controller', d:'If the phone app grabs the session, the app enters reconnecting rather than fighting for it, and says who has the device.' },
+        { t:'Responsive floor', d:'Below 760px wide the dashboard stacks noise control above EQ and the footer wraps; the tray variant is used verbatim inside the PWA on narrow windows.' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

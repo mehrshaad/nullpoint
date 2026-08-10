@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+@keyframes np-pulse { 0% { opacity: .9 } 50% { opacity: .35 } 100% { opacity: .9 } }
+@keyframes np-sync { 0% { opacity: 0; transform: translateY(3px) } 12% { opacity: 1; transform: none } 80% { opacity: 1 } 100% { opacity: 0 } }
+</style>
+</helmet>
+<div style="{{ shell }}">
+  <div style="height:44px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 14px;border-bottom:1px solid var(--line);background:var(--panel)">
+    <div style="display:flex;align-items:center;gap:7px">
+      <div style="width:11px;height:11px;border-radius:50%;background:var(--dot1)"></div>
+      <div style="width:11px;height:11px;border-radius:50%;background:var(--dot2)"></div>
+      <div style="width:11px;height:11px;border-radius:50%;background:var(--dot3)"></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div style="width:9px;height:9px;border-radius:50%;background:var(--accent)"></div>
+      <div style="font:600 11px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:var(--fg2)">NULLPOINT</div>
+    </div>
+    <div style="display:flex;gap:4px">
+      <div tabindex="0" style="font:500 11px/1 'IBM Plex Sans',sans-serif;color:var(--fg3);padding:6px 8px;border-radius:6px;cursor:pointer" style-hover="background:var(--panel2);color:var(--fg)">Settings</div>
+    </div>
+  </div>
+
+  <sc-if value="{{ reconnecting }}" hint-placeholder-val="{{ false }}">
+    <div style="flex:none;display:flex;align-items:center;gap:10px;padding:9px 20px;background:var(--warnBg);border-bottom:1px solid var(--warnLine)">
+      <div style="width:7px;height:7px;border-radius:50%;background:var(--warn);animation:np-pulse 1.4s ease-in-out infinite"></div>
+      <div style="font:500 12px/1.3 'IBM Plex Sans',sans-serif;color:var(--warn)">Link lost — reconnecting to WH-1000XM6…</div>
+      <div style="flex:1"></div>
+      <div tabindex="0" style="font:500 11px/1 'IBM Plex Mono',monospace;letter-spacing:.08em;color:var(--warn);border:1px solid var(--warnLine);padding:5px 9px;border-radius:6px;cursor:pointer">CANCEL</div>
+    </div>
+  </sc-if>
+
+  <div style="flex:none;display:flex;align-items:center;gap:16px;padding:18px 20px 16px">
+    <div style="width:52px;height:52px;flex:none;border-radius:10px;border:1px solid var(--line);background-color:var(--panel2);background-image:repeating-linear-gradient(135deg,transparent 0 5px,var(--stripe) 5px 6px)"></div>
+    <div style="min-width:0">
+      <div style="display:flex;align-items:center;gap:9px">
+        <div style="font:600 19px/1.15 'IBM Plex Sans',sans-serif;letter-spacing:-.01em;color:var(--fg)">WH-1000XM6</div>
+        <div style="display:flex;align-items:center;gap:5px;padding:3px 7px;border-radius:5px;background:var(--okBg)">
+          <div style="width:5px;height:5px;border-radius:50%;background:var(--ok)"></div>
+          <div style="font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:var(--ok)">LINKED</div>
+        </div>
+      </div>
+      <div style="margin-top:5px;font:400 11.5px/1 'IBM Plex Mono',monospace;color:var(--fg3)">FW 2.0.1 · LDAC 990kbps · BT 5.3</div>
+    </div>
+    <div style="flex:1"></div>
+    <div style="display:flex;align-items:center;gap:11px">
+      <div style="text-align:right">
+        <div style="font:600 22px/1 'IBM Plex Mono',monospace;color:{{ battColor }}">{{ battLabel }}</div>
+        <div style="margin-top:5px;font:400 10px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:var(--fg3)">{{ battNote }}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:2px">
+        <div style="width:30px;height:15px;border-radius:3px;border:1.5px solid var(--fg3);padding:2px;display:flex">
+          <div style="{{ battFill }}"></div>
+        </div>
+        <div style="width:2.5px;height:6px;border-radius:0 2px 2px 0;background:var(--fg3)"></div>
+      </div>
+    </div>
+  </div>
+
+  <div style="flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:0 20px 14px">
+    <div style="display:flex;flex-direction:column;gap:12px;padding:15px;border:1px solid var(--line);border-radius:12px;background:var(--panel)">
+      <div style="display:flex;align-items:center;justify-content:space-between;height:16px">
+        <div style="font:600 11px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:var(--fg3)">NOISE CONTROL</div>
+        <sc-if value="{{ synced }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;align-items:center;gap:5px;animation:np-sync 4s ease-out infinite">
+            <div style="width:5px;height:5px;border-radius:50%;background:var(--accent)"></div>
+            <div style="font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:.06em;color:var(--accent)">UPDATED FROM DEVICE</div>
+          </div>
+        </sc-if>
+      </div>
+
+      <div role="radiogroup" aria-label="Noise control mode" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px;padding:3px;border-radius:10px;background:var(--track);border:1px solid var(--line)">
+        <sc-for list="{{ modes }}" as="m" hint-placeholder-count="3">
+          <div role="radio" tabindex="{{ m.tab }}" aria-checked="{{ m.checked }}" aria-label="{{ m.label }}" onClick="{{ m.onSelect }}" onKeyDown="{{ m.onKey }}" style="{{ m.style }}" style-hover="filter:brightness(1.12)">
+            <div style="font:600 12px/1 'IBM Plex Sans',sans-serif">{{ m.label }}</div>
+            <div style="font:400 9.5px/1 'IBM Plex Mono',monospace;letter-spacing:.08em;opacity:.62">{{ m.sub }}</div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="{{ ambientBoxStyle }}">
+        <div style="display:flex;align-items:baseline;justify-content:space-between">
+          <label for="np-amb" style="font:500 12px/1 'IBM Plex Sans',sans-serif;color:var(--fg2)">Ambient level</label>
+          <div style="font:600 13px/1 'IBM Plex Mono',monospace;color:var(--fg)">{{ ambientLabel }}</div>
+        </div>
+        <div id="np-amb" role="slider" tabindex="0" aria-label="Ambient level" aria-valuemin="0" aria-valuemax="20" aria-valuenow="{{ ambient }}" onPointerDown="{{ onAmbDown }}" onKeyDown="{{ onAmbKey }}" style="position:relative;height:26px;display:flex;align-items:center;cursor:pointer;outline:none;touch-action:none" style-focus="box-shadow:0 0 0 2px var(--ring);border-radius:8px">
+          <div style="position:absolute;left:0;right:0;height:6px;border-radius:3px;background:var(--track)"></div>
+          <div style="{{ ambFillStyle }}"></div>
+          <div style="{{ ambThumbStyle }}"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font:400 9.5px/1 'IBM Plex Mono',monospace;color:var(--fg3)">
+          <div>0 · SEALED</div>
+          <div>10</div>
+          <div>20 · OPEN</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:9px;margin-top:2px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+            <div>
+              <div style="font:500 12px/1.2 'IBM Plex Sans',sans-serif;color:var(--fg2)">Auto ambient level</div>
+              <div style="font:400 10px/1.3 'IBM Plex Mono',monospace;color:var(--fg3);margin-top:3px">Adapts to surroundings</div>
+            </div>
+            <div role="switch" tabindex="0" aria-checked="{{ autoAmb }}" aria-label="Auto ambient level" onClick="{{ toggleAuto }}" onKeyDown="{{ onAutoKey }}" style="{{ autoTrack }}" style-focus="box-shadow:0 0 0 2px var(--ring)">
+              <div style="{{ autoKnob }}"></div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;opacity:{{ voiceOpacity }}" title="{{ voiceTip }}">
+            <div>
+              <div style="font:500 12px/1.2 'IBM Plex Sans',sans-serif;color:var(--fg2)">Focus on voice</div>
+              <div style="font:400 10px/1.3 'IBM Plex Mono',monospace;color:var(--fg3);margin-top:3px">{{ voiceNote }}</div>
+            </div>
+            <div role="switch" tabindex="{{ voiceTab }}" aria-checked="{{ voice }}" aria-disabled="{{ voiceDisabled }}" aria-label="Focus on voice" onClick="{{ toggleVoice }}" onKeyDown="{{ onVoiceKey }}" style="{{ voiceTrack }}" style-focus="box-shadow:0 0 0 2px var(--ring)">
+              <div style="{{ voiceKnob }}"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px;padding:15px;border:1px solid var(--line);border-radius:12px;background:var(--panel);min-width:0">
+      <div style="display:flex;align-items:center;justify-content:space-between;height:16px">
+        <div style="font:600 11px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:var(--fg3)">EQUALIZER</div>
+        <div style="font:400 10px/1 'IBM Plex Mono',monospace;color:var(--fg3)">{{ eqNote }}</div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:5px">
+        <sc-for list="{{ presets }}" as="p" hint-placeholder-count="5">
+          <div role="button" tabindex="0" aria-pressed="{{ p.checked }}" onClick="{{ p.onSelect }}" onKeyDown="{{ p.onKey }}" style="{{ p.style }}" style-hover="filter:brightness(1.15)">{{ p.label }}</div>
+        </sc-for>
+      </div>
+      <div style="flex:1;min-height:0;display:flex;align-items:stretch;gap:6px;padding-top:4px">
+        <sc-for list="{{ bands }}" as="b" hint-placeholder-count="6">
+          <div style="{{ b.colStyle }}">
+            <div style="font:600 11px/1 'IBM Plex Mono',monospace;color:{{ b.valueColor }}">{{ b.valueLabel }}</div>
+            <div role="slider" tabindex="{{ b.tab }}" aria-label="{{ b.aria }}" aria-valuemin="-10" aria-valuemax="10" aria-valuenow="{{ b.value }}" aria-disabled="{{ b.disabled }}" onPointerDown="{{ b.onDown }}" onKeyDown="{{ b.onKey }}" style="{{ b.trackStyle }}" style-focus="box-shadow:0 0 0 2px var(--ring)">
+              <div style="position:absolute;left:6px;right:6px;top:50%;height:1px;background:var(--line)"></div>
+              <div style="{{ b.fillStyle }}"></div>
+              <div style="{{ b.thumbStyle }}"></div>
+            </div>
+            <div style="font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:.04em;color:var(--fg3);text-align:center">{{ b.label }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+
+  <div style="flex:none;display:flex;align-items:center;gap:16px;padding:12px 20px;border-top:1px solid var(--line);background:var(--panel)">
+    <div style="width:34px;height:34px;flex:none;border-radius:6px;border:1px solid var(--line);background-color:var(--panel2);background-image:repeating-linear-gradient(135deg,transparent 0 4px,var(--stripe) 4px 5px)"></div>
+    <div style="min-width:0;width:190px">
+      <div style="font:500 12px/1.2 'IBM Plex Sans',sans-serif;color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Sonata in Grey</div>
+      <div style="font:400 10.5px/1.2 'IBM Plex Mono',monospace;color:var(--fg3);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Hollow Field</div>
+    </div>
+    <div style="flex:1;display:flex;align-items:center;gap:10px">
+      <div style="font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:var(--fg3)">VOL</div>
+      <div role="slider" tabindex="0" aria-label="Volume" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ volume }}" onPointerDown="{{ onVolDown }}" onKeyDown="{{ onVolKey }}" style="position:relative;flex:1;height:22px;display:flex;align-items:center;cursor:pointer;outline:none;touch-action:none" style-focus="box-shadow:0 0 0 2px var(--ring);border-radius:8px">
+        <div style="position:absolute;left:0;right:0;height:4px;border-radius:2px;background:var(--track)"></div>
+        <div style="{{ volFillStyle }}"></div>
+        <div style="{{ volThumbStyle }}"></div>
+      </div>
+      <div style="width:34px;text-align:right;font:600 12px/1 'IBM Plex Mono',monospace;color:var(--fg2)">{{ volume }}</div>
+    </div>
+    <div style="padding-left:14px;border-left:1px solid var(--line);text-align:right">
+      <div style="font:600 12px/1 'IBM Plex Mono',monospace;color:var(--fg2)">{{ spl }} dB</div>
+      <div style="font:400 9.5px/1 'IBM Plex Mono',monospace;letter-spacing:.08em;color:var(--fg3);margin-top:4px">SOUND PRESSURE</div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:900,&quot;height&quot;:640},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;dark&quot;,&quot;light&quot;],&quot;default&quot;:&quot;dark&quot;,&quot;tsType&quot;:&quot;'dark' | 'light'&quot;},&quot;lowBattery&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;unsupportedFeatures&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;syncedFromDevice&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;reconnecting&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;}}">
+const DARK = {
+  '--bg':'#0B0C0E','--panel':'#121418','--panel2':'#191C21','--line':'#25292F','--track':'#1D2126',
+  '--fg':'#E7E9EC','--fg2':'#9BA2AB','--fg3':'#6B727C','--stripe':'#2A2F36',
+  '--accent':'#6EA6EF','--accentSoft':'rgba(110,166,239,.14)','--amber':'#E0A15C','--amberSoft':'rgba(224,161,92,.14)',
+  '--ok':'#7FC29B','--okBg':'rgba(127,194,155,.12)','--warn':'#E58A6B','--warnBg':'rgba(229,138,107,.10)','--warnLine':'rgba(229,138,107,.32)',
+  '--ring':'rgba(110,166,239,.55)','--dot1':'#2E3238','--dot2':'#2E3238','--dot3':'#2E3238','--knob':'#0B0C0E'
+};
+const LIGHT = {
+  '--bg':'#F4F4F2','--panel':'#FFFFFF','--panel2':'#EDEDEA','--line':'#DEDED8','--track':'#E4E4DF',
+  '--fg':'#17191C','--fg2':'#565C64','--fg3':'#878D95','--stripe':'#DCDCD6',
+  '--accent':'#2C6BC9','--accentSoft':'rgba(44,107,201,.10)','--amber':'#A9701F','--amberSoft':'rgba(169,112,31,.12)',
+  '--ok':'#3C8A62','--okBg':'rgba(60,138,98,.10)','--warn':'#B4552F','--warnBg':'rgba(180,85,47,.08)','--warnLine':'rgba(180,85,47,.28)',
+  '--ring':'rgba(44,107,201,.45)','--dot1':'#D8D8D2','--dot2':'#D8D8D2','--dot3':'#D8D8D2','--knob':'#FFFFFF'
+};
+const BANDS = [
+  { id:'cb', label:'CLEAR\nBASS', aria:'Clear Bass' },
+  { id:'b1', label:'400', aria:'400 hertz band' },
+  { id:'b2', label:'1k', aria:'1 kilohertz band' },
+  { id:'b3', label:'2.5k', aria:'2.5 kilohertz band' },
+  { id:'b4', label:'6.3k', aria:'6.3 kilohertz band' },
+  { id:'b5', label:'16k', aria:'16 kilohertz band' }
+];
+const PRESET_VALUES = {
+  Heavy:  { cb:6, b1:5, b2:2, b3:-1, b4:2, b5:4 },
+  Clear:  { cb:2, b1:-1, b2:1, b3:3, b4:4, b5:5 },
+  Hard:   { cb:4, b1:3, b2:-2, b3:2, b4:5, b5:3 },
+  Soft:   { cb:1, b1:2, b2:3, b3:0, b4:-2, b5:-3 },
+  Custom: { cb:3, b1:2, b2:0, b3:-2, b4:3, b5:5 }
+};
+
+class Component extends DCLogic {
+  state = {
+    mode: 'anc', ambient: 12, autoAmb: true, voice: false,
+    preset: 'Custom', values: { ...PRESET_VALUES.Custom }, volume: 62
+  };
+
+  t() { return (this.props.theme || 'dark') === 'light' ? LIGHT : DARK; }
+
+  dragLinear(e, min, max, vertical, apply) {
+    const el = e.currentTarget;
+    const r = el.getBoundingClientRect();
+    const calc = (ev) => {
+      const frac = vertical
+        ? 1 - (ev.clientY - r.top) / r.height
+        : (ev.clientX - r.left) / r.width;
+      apply(Math.round(min + Math.max(0, Math.min(1, frac)) * (max - min)));
+    };
+    calc(e);
+    const move = (ev) => calc(ev);
+    const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    e.preventDefault();
+  }
+
+  keyStep(e, cur, min, max, apply, big) {
+    const k = e.key;
+    let v = null;
+    if (k === 'ArrowUp' || k === 'ArrowRight') v = cur + 1;
+    else if (k === 'ArrowDown' || k === 'ArrowLeft') v = cur - 1;
+    else if (k === 'PageUp') v = cur + (big || 5);
+    else if (k === 'PageDown') v = cur - (big || 5);
+    else if (k === 'Home') v = min;
+    else if (k === 'End') v = max;
+    if (v === null) return;
+    e.preventDefault();
+    apply(Math.max(min, Math.min(max, v)));
+  }
+
+  renderVals() {
+    const p = this.props, s = this.state, T = this.t();
+    const light = (p.theme || 'dark') === 'light';
+    const low = !!p.lowBattery;
+    const unsupported = !!p.unsupportedFeatures;
+    const ambientActive = s.mode === 'ambient';
+    const shell = Object.assign({}, T, {
+      height: '100%', display: 'flex', flexDirection: 'column',
+      background: 'var(--bg)', color: 'var(--fg)', overflow: 'hidden',
+      fontFamily: "'IBM Plex Sans', system-ui, sans-serif",
+      colorScheme: light ? 'light' : 'dark'
+    });
+
+    const batt = low ? 9 : 78;
+    const modes = [
+      { id:'anc', label:'Noise Canceling', sub:'ANC' },
+      { id:'ambient', label:'Ambient Sound', sub:'AMB' },
+      { id:'off', label:'Off', sub:'BYPASS' }
+    ].map((m, i) => {
+      const on = s.mode === m.id;
+      const tint = m.id === 'ambient' ? 'var(--amber)' : m.id === 'anc' ? 'var(--accent)' : 'var(--fg2)';
+      return {
+        ...m,
+        checked: on,
+        tab: on ? 0 : -1,
+        onSelect: () => this.setState({ mode: m.id }),
+        onKey: (e) => {
+          const order = ['anc','ambient','off'];
+          if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); this.setState({ mode: order[(i+1)%3] }); }
+          if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); this.setState({ mode: order[(i+2)%3] }); }
+          if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); this.setState({ mode: m.id }); }
+        },
+        style: {
+          display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:'4px',
+          height:'52px', borderRadius:'8px', cursor:'pointer', outline:'none', userSelect:'none',
+          background: on ? (m.id === 'ambient' ? 'var(--amberSoft)' : m.id === 'anc' ? 'var(--accentSoft)' : 'var(--panel2)') : 'transparent',
+          border: '1px solid ' + (on ? tint : 'transparent'),
+          color: on ? tint : 'var(--fg3)',
+          transition: 'background .16s ease, color .16s ease, border-color .16s ease'
+        }
+      };
+    });
+
+    const ambSet = (v) => this.setState({ ambient: v, autoAmb: false });
+    const volSet = (v) => this.setState({ volume: v });
+
+    const bands = BANDS.map((b) => {
+      const v = s.values[b.id];
+      const custom = s.preset === 'Custom';
+      const frac = (v + 10) / 20;
+      const tint = custom ? 'var(--accent)' : 'var(--fg3)';
+      return {
+        ...b,
+        value: v,
+        valueLabel: (v > 0 ? '+' : '') + v,
+        valueColor: custom ? 'var(--fg)' : 'var(--fg3)',
+        disabled: !custom,
+        tab: custom ? 0 : -1,
+        colStyle: { flex:'1', display:'flex', flexDirection:'column', alignItems:'center', gap:'8px', minWidth:0, opacity: custom ? 1 : .5 },
+        trackStyle: {
+          position:'relative', width:'100%', maxWidth:'34px', flex:'1', minHeight:'96px',
+          borderRadius:'8px', background:'var(--track)', border:'1px solid var(--line)',
+          cursor: custom ? 'ns-resize' : 'not-allowed', outline:'none', touchAction:'none'
+        },
+        fillStyle: {
+          position:'absolute', left:'5px', right:'5px',
+          bottom: v >= 0 ? '50%' : (frac * 100) + '%',
+          top: v >= 0 ? (100 - frac * 100) + '%' : '50%',
+          background: tint, opacity:.32, borderRadius:'3px', transition:'top .1s linear, bottom .1s linear'
+        },
+        thumbStyle: {
+          position:'absolute', left:'3px', right:'3px', height:'10px',
+          bottom: 'calc(' + (frac * 100) + '% - 5px)',
+          borderRadius:'5px', background: tint,
+          boxShadow: light ? '0 1px 2px rgba(0,0,0,.25)' : '0 1px 3px rgba(0,0,0,.6)',
+          transition:'bottom .1s linear'
+        },
+        onDown: custom ? ((e) => this.dragLinear(e, -10, 10, true, (val) => this.setState((st) => ({ values: { ...st.values, [b.id]: val } })))) : undefined,
+        onKey: custom ? ((e) => this.keyStep(e, v, -10, 10, (val) => this.setState((st) => ({ values: { ...st.values, [b.id]: val } })), 5)) : undefined
+      };
+    });
+
+    const presets = ['Heavy','Clear','Hard','Soft','Custom'].map((name) => {
+      const on = s.preset === name;
+      return {
+        label: name,
+        checked: on,
+        onSelect: () => this.setState({ preset: name, values: { ...PRESET_VALUES[name] } }),
+        onKey: (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); this.setState({ preset: name, values: { ...PRESET_VALUES[name] } }); } },
+        style: {
+          padding:'6px 11px', borderRadius:'7px', cursor:'pointer', outline:'none', userSelect:'none',
+          font:"500 11.5px/1 'IBM Plex Sans', sans-serif",
+          background: on ? 'var(--accentSoft)' : 'transparent',
+          border: '1px solid ' + (on ? 'var(--accent)' : 'var(--line)'),
+          color: on ? 'var(--accent)' : 'var(--fg2)',
+          transition:'all .14s ease'
+        }
+      };
+    });
+
+    const sw = (on, disabled) => ({
+      track: {
+        position:'relative', width:'38px', height:'22px', flex:'none', borderRadius:'11px',
+        background: on ? 'var(--accent)' : 'var(--track)',
+        border:'1px solid ' + (on ? 'var(--accent)' : 'var(--line)'),
+        cursor: disabled ? 'not-allowed' : 'pointer', outline:'none',
+        opacity: disabled ? .55 : 1, transition:'background .16s ease'
+      },
+      knob: {
+        position:'absolute', top:'2px', left: on ? '18px' : '2px', width:'16px', height:'16px',
+        borderRadius:'50%', background: on ? 'var(--knob)' : 'var(--fg3)',
+        transition:'left .16s cubic-bezier(.32,.72,0,1)'
+      }
+    });
+    const autoS = sw(s.autoAmb, false);
+    const voiceS = sw(s.voice && !unsupported, unsupported);
+
+    return {
+      shell, modes, bands, presets,
+      reconnecting: !!p.reconnecting,
+      synced: !!p.syncedFromDevice,
+      battLabel: batt + '%',
+      battNote: low ? 'LOW — 1H LEFT' : 'APPROX 24H',
+      battColor: low ? 'var(--warn)' : 'var(--fg)',
+      battFill: { width: batt + '%', borderRadius:'1px', background: low ? 'var(--warn)' : 'var(--ok)' },
+      ambient: s.ambient,
+      ambientLabel: (s.autoAmb ? 'AUTO · ' : '') + s.ambient + ' / 20',
+      ambientBoxStyle: {
+        display:'flex', flexDirection:'column', gap:'8px', padding:'13px',
+        borderRadius:'10px', background:'var(--panel2)', border:'1px solid var(--line)',
+        opacity: ambientActive ? 1 : .38,
+        pointerEvents: ambientActive ? 'auto' : 'none',
+        transition:'opacity .18s ease'
+      },
+      ambFillStyle: { position:'absolute', left:0, height:'6px', borderRadius:'3px', background:'var(--amber)', width:(s.ambient/20*100)+'%' },
+      ambThumbStyle: {
+        position:'absolute', left:'calc(' + (s.ambient/20*100) + '% - 8px)', width:'16px', height:'16px',
+        borderRadius:'50%', background:'var(--amber)', border:'3px solid var(--panel2)',
+        boxShadow:'0 1px 4px rgba(0,0,0,.45)'
+      },
+      onAmbDown: (e) => this.dragLinear(e, 0, 20, false, ambSet),
+      onAmbKey: (e) => this.keyStep(e, s.ambient, 0, 20, ambSet, 5),
+      autoAmb: s.autoAmb, autoTrack: autoS.track, autoKnob: autoS.knob,
+      toggleAuto: () => this.setState((st) => ({ autoAmb: !st.autoAmb })),
+      onAutoKey: (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); this.setState((st) => ({ autoAmb: !st.autoAmb })); } },
+      voice: s.voice && !unsupported,
+      voiceDisabled: unsupported,
+      voiceTab: unsupported ? -1 : 0,
+      voiceOpacity: unsupported ? .45 : 1,
+      voiceTip: unsupported ? 'Not supported by WH-1000XM4 firmware 1.x' : 'Boosts speech in ambient mode',
+      voiceNote: unsupported ? 'UNSUPPORTED ON THIS MODEL' : 'Passes speech through',
+      voiceTrack: voiceS.track, voiceKnob: voiceS.knob,
+      toggleVoice: unsupported ? undefined : (() => this.setState((st) => ({ voice: !st.voice }))),
+      onVoiceKey: unsupported ? undefined : ((e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); this.setState((st) => ({ voice: !st.voice })); } }),
+      eqNote: s.preset === 'Custom' ? 'DRAG OR ARROW KEYS · dB' : 'PRESET — SELECT CUSTOM TO EDIT',
+      volume: s.volume,
+      volFillStyle: { position:'absolute', left:0, height:'4px', borderRadius:'2px', background:'var(--fg2)', width:(s.volume)+'%' },
+      volThumbStyle: { position:'absolute', left:'calc(' + s.volume + '% - 6px)', width:'12px', height:'12px', borderRadius:'50%', background:'var(--fg)' },
+      onVolDown: (e) => this.dragLinear(e, 0, 100, false, volSet),
+      onVolKey: (e) => this.keyStep(e, s.volume, 0, 100, volSet, 10),
+      spl: s.mode === 'off' ? 74 : s.mode === 'ambient' ? 68 : 61
+    };
+  }
+}
+</script>
+</body>
+</html>
