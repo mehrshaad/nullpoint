@@ -2,6 +2,50 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Headphones, type HeadphonesState } from "@ssc/core";
 import { WebSerialTransport } from "@ssc/transport-webserial";
 
+/**
+ * Turns a raw failure into something the person can act on. The cause matters a lot here:
+ * "no port in the chooser" and "the headset refused the link" need completely different fixes,
+ * so we never show a single canned explanation.
+ */
+export function describeConnectError(err: unknown): { headline: string; hint: string; detail: string } {
+  const detail = err instanceof Error ? err.message : String(err);
+  const name = err instanceof Error ? err.name : "";
+
+  if (/No port selected/i.test(detail) || name === "NotFoundError") {
+    return {
+      headline: "No headphones showed up",
+      hint: "Either the picker was dismissed, or Windows isn't offering the headset's control service. Make sure the headphones are connected (not just paired), then try again. Closing Sony's phone app can help — it can hold the control channel open.",
+      detail,
+    };
+  }
+  if (name === "SecurityError" || /permission/i.test(detail)) {
+    return {
+      headline: "The browser blocked the connection",
+      hint: "Serial access needs a secure page and your permission. On the web, use HTTPS and allow the device when prompted.",
+      detail,
+    };
+  }
+  if (name === "NetworkError" || /already open|failed to open|access denied/i.test(detail)) {
+    return {
+      headline: "The headphones are busy",
+      hint: "Another app is holding the control link — usually Sony's Sound Connect on your phone, or a second copy of Nullpoint. Close it and try again.",
+      detail,
+    };
+  }
+  if (/Timed out|No ACK/i.test(detail)) {
+    return {
+      headline: "The headphones didn't answer",
+      hint: "The link opened but the headset never replied. Power it off and on, then reconnect.",
+      detail,
+    };
+  }
+  return {
+    headline: "Couldn't reach your headphones",
+    hint: "The connection failed before the headset could be read. Check that it's powered on and connected, then try again.",
+    detail,
+  };
+}
+
 export type ConnectionStatus =
   | { status: "unsupported" }
   | { status: "idle" }

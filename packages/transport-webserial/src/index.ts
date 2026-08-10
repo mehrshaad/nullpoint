@@ -27,11 +27,30 @@ export class WebSerialTransport implements Transport {
     return "serial" in navigator;
   }
 
-  /** Must be called synchronously from a user gesture — browser security requirement. */
+  /**
+   * Must be called synchronously from a user gesture — browser security requirement.
+   *
+   * Both options are required to reach a Bluetooth device, and they do different jobs:
+   * `filters` narrows what the chooser shows, while `allowedBluetoothServiceClassIds` is the
+   * security gate that lets the page touch that RFCOMM service class at all. Without the
+   * second one Chrome excludes every Bluetooth port from the chooser, so the picker comes up
+   * empty and requestPort rejects with "No port selected by the user".
+   */
   static async pickPort(): Promise<SerialPort> {
+    const serviceClassId = SONY_SPP_SERVICE_UUID.toLowerCase();
     return navigator.serial.requestPort({
-      filters: [{ bluetoothServiceClassId: SONY_SPP_SERVICE_UUID.toLowerCase() }],
+      filters: [{ bluetoothServiceClassId: serviceClassId }],
+      allowedBluetoothServiceClassIds: [serviceClassId],
     } as SerialPortRequestOptions);
+  }
+
+  /** Ports the user has already granted us, used for diagnostics on the failure screen. */
+  static async grantedPortCount(): Promise<number> {
+    try {
+      return (await navigator.serial.getPorts()).length;
+    } catch {
+      return 0;
+    }
   }
 
   constructor(port: SerialPort) {

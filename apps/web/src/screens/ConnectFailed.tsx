@@ -1,6 +1,12 @@
+import { describeConnectError } from "../state/useHeadphones.js";
 import { TitleBar } from "./TitleBar.js";
 
-/** design/SoundConnect Desktop.dc.html §1b "CONNECTION FAILED" — RFCOMM copy fix per PLAN.md §5.3. */
+/**
+ * design/SoundConnect Desktop.dc.html §1b "CONNECTION FAILED".
+ * The explanation is derived from the actual error rather than assumed — see
+ * describeConnectError — because "nothing in the picker" and "the headset refused" look
+ * identical here but need different fixes.
+ */
 export function ConnectFailed({
   message,
   onRetry,
@@ -10,6 +16,8 @@ export function ConnectFailed({
   onRetry: () => void;
   onChooseAnother: () => void;
 }) {
+  const { headline, hint, detail } = describeConnectError(new Error(message));
+
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "var(--bg)" }}>
       <TitleBar statusColor="var(--warn)" />
@@ -38,23 +46,25 @@ export function ConnectFailed({
           <div style={{ width: 3, height: 44, borderRadius: 2, background: "var(--warn)" }} />
         </div>
         <div style={{ marginTop: 26, fontWeight: 600, fontSize: 22, letterSpacing: "-0.02em", color: "var(--fg)" }}>
-          Couldn't reach your headphones
+          {headline}
         </div>
         <div
           style={{
             marginTop: 12,
-            maxWidth: 440,
+            maxWidth: 460,
             textAlign: "center",
             fontSize: 13,
             lineHeight: 1.6,
             color: "var(--fg2)",
           }}
         >
-          The device answered pairing but closed the control link. This usually means another
-          app — often Sound Connect on your phone — holds the session.
+          {hint}
         </div>
-        <div className="mono" style={{ marginTop: 12, fontSize: 11, color: "var(--fg3)" }}>
-          {message}
+        <div
+          className="mono"
+          style={{ marginTop: 14, fontSize: 10.5, color: "var(--fg3)", maxWidth: 520, textAlign: "center" }}
+        >
+          {detail}
         </div>
         <div style={{ marginTop: 26, display: "flex", gap: 10 }}>
           <button
@@ -69,7 +79,7 @@ export function ConnectFailed({
               fontSize: 13.5,
             }}
           >
-            Retry
+            Try again
           </button>
           <button
             onClick={onChooseAnother}
@@ -83,7 +93,7 @@ export function ConnectFailed({
               fontSize: 13.5,
             }}
           >
-            Choose another device
+            Start over
           </button>
         </div>
       </div>

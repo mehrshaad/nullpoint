@@ -64,7 +64,10 @@ function registerAppProtocol(): void {
 function pickSonyPort(ports: Electron.SerialPort[]): Electron.SerialPort | undefined {
   const byName = ports.find((p) => /wh-1000x|wf-1000x|sony/i.test(p.displayName ?? ""));
   if (byName) return byName;
-  return ports.length === 1 ? ports[0] : undefined;
+  // The renderer already constrained requestPort to Sony's SPP service class, so anything
+  // Electron offers here advertises that service — falling back to the first is safe, and
+  // better than cancelling (preventDefault means there is no built-in chooser to fall back to).
+  return ports[0];
 }
 
 /** True when this launch came from the OS login item (or the user passed --hidden). */
@@ -207,11 +210,18 @@ if (!app.requestSingleInstanceLock()) {
 
     session.defaultSession.setPermissionCheckHandler((_wc, permission) => permission === "serial");
 
+    // Without this, a port chosen below is still refused when the renderer tries to open it.
+    session.defaultSession.setDevicePermissionHandler((details) => details.deviceType === "serial");
+
     session.defaultSession.on("select-serial-port", (event, portList, _webContents, callback) => {
       event.preventDefault();
       const chosen = pickSonyPort(portList);
-      // No confident match — return "" so the renderer's own picker handles disambiguation
-      // rather than us guessing wrong.
+      // Logged because an empty list is the single most useful clue when a headset will not
+      // connect: it means the OS is not exposing Sony's RFCOMM service to Chromium at all.
+      console.log(
+        `[nullpoint] serial ports offered: ${portList.length}`,
+        portList.map((p) => p.displayName ?? p.portId)
+      );
       callback(chosen ? chosen.portId : "");
     });
 
