@@ -29,11 +29,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Typecheck
-        run: pnpm -r run typecheck
-
+      # Build first: packages consume each other through their built .d.ts files, so a clean
+      # checkout has nothing for typecheck to resolve until the dependencies are compiled.
+      # pnpm -r runs these in workspace dependency order.
       - name: Build
         run: pnpm -r run build
+
+      - name: Typecheck
+        run: pnpm -r run typecheck
 
       - name: Test
         run: pnpm -r run test

@@ -34,7 +34,8 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm --filter @ssc/web run build
+      # The "..." suffix also builds @ssc/web's workspace dependencies, which it needs for types.
+      - run: pnpm --filter "@ssc/web..." run build
 
       - name: Add CNAME for the custom domain
         run: echo "nullpoint.ali-dadashzadeh.ir" > apps/web/dist/CNAME
