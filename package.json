@@ -5,7 +5,7 @@
   "description": "Nullpoint — an unofficial desktop/web client for Sony Sound Connect headphones",
   "license": "Apache-2.0",
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "packageManager": "pnpm@11.21.0",
   "scripts": {
