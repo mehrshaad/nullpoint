@@ -76,6 +76,12 @@ The wire protocol (frame markers, escaping, checksum, the MDR V2 command set) wa
 
 The UI implements the Nullpoint design system checked into [`design/`](./design) — open `design/SoundConnect Desktop.dc.html` in a browser (with `design/support.js` alongside it) for the full token, component, and state spec.
 
+## Multipoint
+
+The WH-1000X series plays audio from two devices at once, but it hands out its **settings channel to one device at a time**. So if your phone currently holds that channel, Nullpoint will find the headphones and then fail to open the link (`0x2740`, "only one usage of each socket address"). Disconnect the headphones from the other device and try again — Sony's app doesn't need to be open for the phone to be holding it.
+
+The reverse applies too: while Nullpoint is connected, the phone app won't be able to change settings. Audio to both devices is unaffected either way.
+
 ## Known limitations
 
 - No signed builds. Windows SmartScreen warns on the installer; macOS has no downloadable build at all.

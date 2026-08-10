@@ -27,8 +27,8 @@ export function describeConnectError(err: unknown): { headline: string; hint: st
   }
   if (name === "NetworkError" || /already open|failed to open|access denied/i.test(detail)) {
     return {
-      headline: "The headphones are busy",
-      hint: "Another app is holding the control link — usually Sony's Sound Connect on your phone, or a second copy of Nullpoint. Close it and try again.",
+      headline: "Something else is holding the control link",
+      hint: "These headphones accept settings from one device at a time, even though they play audio from two. If they're also connected to your phone, disconnect them there and try again — Sony's app doesn't need to be open for the phone to be holding the link. A copy of Nullpoint still running in the tray will do the same.",
       detail,
     };
   }
