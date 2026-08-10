@@ -1,0 +1,55 @@
+Nullpoint (sony-sound-connect)
+Copyright (c) 2026 the Nullpoint contributors
+
+This project is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+===============================================================================
+
+This product's Bluetooth control protocol implementation (packages/core) is a
+derivative port of reverse-engineering work from the following MIT-licensed
+projects. Their protocol research and reference implementations made this
+project possible.
+
+--------------------------------------------------------------------------
+SonyHeadphonesClient (original)
+https://github.com/Plutoberth/SonyHeadphonesClient
+Copyright (c) 2020 Netanel Mirous ("Plutoberth")
+
+MIT License
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to
+deal in the Software without restriction, including without limitation the
+rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+sell copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+--------------------------------------------------------------------------
+SonyHeadphonesClient (mos9527 fork)
+https://github.com/mos9527/SonyHeadphonesClient
+Copyright (c) mos9527 and contributors
+
+MIT License (same terms as above)
+
+Wire-protocol framing (start/end markers, byte-escaping scheme, checksum
+computation, sequence/ACK handling) and device-support research for
+WH-1000XM5 / WH-1000XM6 / Protocol V2 were derived from this fork's
+`src/CommandSerializer.{h,cpp}`, `src/Constants.h`, `src/ByteMagic.h`, and
+`src/Headphones.{h,cpp}`, and its `docs/device-support/` notes.
+
+===============================================================================
+
+This is an independent, unofficial project. It is not affiliated with,
+endorsed by, or connected to Sony Group Corporation. Product and model names
+(e.g. "WH-1000XM6") are used solely to identify compatible hardware.

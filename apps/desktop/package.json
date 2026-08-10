@@ -1,0 +1,23 @@
+{
+  "name": "@ssc/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Nullpoint desktop app (Electron) — Windows now, macOS later",
+  "license": "Apache-2.0",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "tsc -p tsconfig.json && electron .",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "package:win": "pnpm run build && electron-builder --win"
+  },
+  "dependencies": {
+    "@ssc/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "electron": "^32.2.5",
+    "electron-builder": "^25.1.8",
+    "typescript": "^5.6.3"
+  }
+}

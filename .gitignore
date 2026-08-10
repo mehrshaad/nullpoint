@@ -1,0 +1,10 @@
+node_modules/
+dist/
+dist-electron/
+dist-ts/
+release/
+*.log
+*.tsbuildinfo
+.DS_Store
+.vite/
+coverage/

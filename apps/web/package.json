@@ -1,0 +1,28 @@
+{
+  "name": "@ssc/web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Nullpoint web app (PWA) — Chrome/Edge desktop only, Web Serial transport",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "typecheck": "tsc -b --noEmit",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@ssc/core": "workspace:*",
+    "@ssc/transport-webserial": "workspace:*",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@types/w3c-web-serial": "^1.0.7",
+    "@vitejs/plugin-react": "^4.3.3",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10"
+  }
+}

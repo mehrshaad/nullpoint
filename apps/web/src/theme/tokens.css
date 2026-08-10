@@ -1,0 +1,84 @@
+/* Design tokens — PLAN.md §5.3, copied verbatim from design/Dashboard.dc.html DARK/LIGHT objects. */
+
+:root,
+[data-theme="dark"] {
+  --bg: #0b0c0e;
+  --panel: #121418;
+  --panel2: #191c21;
+  --line: #25292f;
+  --track: #1d2126;
+  --fg: #e7e9ec;
+  --fg2: #9ba2ab;
+  --fg3: #6b727c;
+  --stripe: #2a2f36;
+  --accent: #6ea6ef;
+  --accent-soft: rgba(110, 166, 239, 0.14);
+  --amber: #e0a15c;
+  --amber-soft: rgba(224, 161, 92, 0.14);
+  --ok: #7fc29b;
+  --ok-bg: rgba(127, 194, 155, 0.12);
+  --warn: #e58a6b;
+  --warn-bg: rgba(229, 138, 107, 0.1);
+  --warn-line: rgba(229, 138, 107, 0.32);
+  --ring: rgba(110, 166, 239, 0.55);
+  --dot: #2e3238;
+  --knob: #0b0c0e;
+}
+
+[data-theme="light"] {
+  --bg: #f4f4f2;
+  --panel: #ffffff;
+  --panel2: #ededea;
+  --line: #deded8;
+  --track: #e4e4df;
+  --fg: #17191c;
+  --fg2: #565c64;
+  --fg3: #878d95;
+  --stripe: #dcdcd6;
+  --accent: #2c6bc9;
+  --accent-soft: rgba(44, 107, 201, 0.1);
+  --amber: #a9701f;
+  --amber-soft: rgba(169, 112, 31, 0.12);
+  --ok: #3c8a62;
+  --ok-bg: rgba(60, 138, 98, 0.1);
+  --warn: #b4552f;
+  --warn-bg: rgba(180, 85, 47, 0.08);
+  --warn-line: rgba(180, 85, 47, 0.28);
+  --ring: rgba(44, 107, 201, 0.45);
+  --dot: #d8d8d2;
+  --knob: #ffffff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+}
+
+.mono {
+  font-family: "IBM Plex Mono", monospace;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
