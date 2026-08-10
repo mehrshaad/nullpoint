@@ -163,7 +163,7 @@ export function Settings({
             reverse-engineering work; features may break after firmware updates.
           </div>
           <div style={{ marginTop: 14, display: "flex", gap: 16, fontWeight: 500, fontSize: 11.5 }}>
-            <a href="https://github.com/mehrshaad/sony-sound-connect" target="_blank" rel="noreferrer">
+            <a href="https://github.com/mehrshaad/nullpoint" target="_blank" rel="noreferrer">
               Source &amp; licenses
             </a>
             <a href="https://github.com/mos9527/SonyHeadphonesClient" target="_blank" rel="noreferrer">
