@@ -23,8 +23,17 @@ export function App() {
     case "failed":
       return <ConnectFailed message={connection.message} onRetry={connect} onChooseAnother={reset} />;
     case "connected":
+    case "reconnecting":
+      // Keep showing the dashboard with the last-known state while reconnecting (design §5.3
+      // rule: "A banner replaces nothing") rather than dropping back to a blank screen.
       return deviceState && headphones ? (
-        <Dashboard state={deviceState} headphones={headphones} onSettingsClick={() => setShowSettings(true)} />
+        <Dashboard
+          state={deviceState}
+          headphones={headphones}
+          onSettingsClick={() => setShowSettings(true)}
+          reconnecting={connection.status === "reconnecting"}
+          onCancelReconnect={reset}
+        />
       ) : (
         <Connecting onCancel={reset} />
       );

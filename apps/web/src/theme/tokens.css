@@ -82,3 +82,15 @@ button {
   font-family: inherit;
   cursor: pointer;
 }
+
+/* design §5.3 rule 4 "Responsive floor" — below 760px the dashboard stacks
+   NOISE CONTROL above EQUALIZER instead of the side-by-side two-column grid. */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+@media (max-width: 760px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
