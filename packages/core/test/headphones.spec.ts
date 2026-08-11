@@ -137,6 +137,7 @@ describe("Headphones.connect() over a fake device", () => {
       mode: NcAsmMode.NC,
       ambientMode: AmbientSoundMode.NORMAL,
       ambientLevel: 12,
+      settled: true,
     });
     expect(state.eq).toEqual({
       preset: EqPresetId.CUSTOM,
@@ -266,6 +267,33 @@ describe("Headphones.connect() over a fake device", () => {
     expect(events).toContain("controlLost");
     expect(hp.controllable).toBe(false);
   }, 20_000);
+
+  it("ignores an in-flight frame so a freshly chosen mode does not snap back", async () => {
+    const transport = new LoopbackTransport(createFakeDevice());
+    const hp = new Headphones(transport);
+    await hp.connect();
+    await hp.setNoiseMode("ambient");
+    expect(hp.state.ncAsm?.mode).toBe(NcAsmMode.ASM);
+
+    // The headset reports the value it is leaving behind while a change is still in motion.
+    // Adopting that would visibly bounce the UI back to the previous mode.
+    transport.emit(
+      packageDataForBt(
+        DataType.DATA_MDR,
+        0,
+        Uint8Array.from([
+          CommandT1.NCASM_NTFY_PARAM,
+          NcAsmInquiredType.MODE_NC_ASM_DUAL_NC_MODE_SWITCH_AND_ASM_SEAMLESS,
+          ValueChangeStatus.UNDER_CHANGING,
+          OnOff.ON,
+          NcAsmMode.NC, // the old mode
+          AmbientSoundMode.NORMAL,
+          12,
+        ])
+      )
+    );
+    expect(hp.state.ncAsm?.mode).toBe(NcAsmMode.ASM);
+  });
 
   it("emits 'disconnected' when the transport link drops", async () => {
     const transport = new LoopbackTransport(createFakeDevice());

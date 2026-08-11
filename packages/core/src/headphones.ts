@@ -49,6 +49,8 @@ const MAX_SEND_ATTEMPTS = 3; // PLAN.md §4.3: retry-on-timeout
 const BATTERY_REFRESH_MS = 60_000;
 /** While another device holds control, probe often so we notice the moment it lets go. */
 const CONTROL_PROBE_MS = 4_000;
+/** How long to wait for the headset to announce that a change has taken effect. */
+const CONFIRM_TIMEOUT_MS = 2_500;
 
 /**
  * A single connected headset. Owns the frame reassembler and the send/ACK/retry loop;
@@ -197,13 +199,23 @@ export class Headphones {
     this.state.ncAsm = next;
     this.emit({ type: "ncAsm", state: next, origin: "local" });
     try {
+      // Listen before sending: the headset announces the change itself, and waiting for that
+      // announcement is what confirms it landed. Polling with a GET instead races the change —
+      // the headset applies it asynchronously and answers with the value still on its way out,
+      // which is what made a freshly picked mode snap back to the previous one.
+      const settled = this.waitForSettledNcAsm(CONFIRM_TIMEOUT_MS);
       await this.send(DataType.DATA_MDR, NcAsm.encodeSetNcAsm(next));
-      // Read back rather than trusting the write. The device is the source of truth, and this
-      // is what stops the UI showing a state the headphones were never in — which is exactly
-      // what happens when another device holds the control channel.
-      await this.request(DataType.DATA_MDR, NcAsm.encodeGetNcAsm(), CommandT1.NCASM_RET_PARAM);
+      await settled;
       this.noteResponsive();
     } catch {
+      // No announcement. Ask outright before concluding anything: some changes are quiet.
+      try {
+        await this.request(DataType.DATA_MDR, NcAsm.encodeGetNcAsm(), CommandT1.NCASM_RET_PARAM);
+        this.noteResponsive();
+        return;
+      } catch {
+        // genuinely unreachable — fall through to the revert below
+      }
       // Put the last known-good value back rather than leaving the optimistic one on screen.
       if (confirmed) {
         this.state.ncAsm = confirmed;
@@ -212,6 +224,29 @@ export class Headphones {
       this.emit({ type: "writeFailed", feature: "ncAsm" });
       this.noteControlLost();
     }
+  }
+
+  /**
+   * Resolves once the headset reports an NC/ASM state it considers final. Interim frames
+   * (valueChangeStatus = UNDER_CHANGING) are ignored, since they describe a setting in motion.
+   */
+  private waitForSettledNcAsm(timeoutMs: number): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const unsubscribes: Array<() => void> = [];
+      const finish = (ok: boolean) => {
+        clearTimeout(timer);
+        for (const off of unsubscribes) off();
+        ok ? resolve() : reject(new Error("headset did not confirm the change"));
+      };
+      const timer = setTimeout(() => finish(false), timeoutMs);
+      for (const command of [CommandT1.NCASM_NTFY_PARAM, CommandT1.NCASM_RET_PARAM]) {
+        unsubscribes.push(
+          this.onRawResponse(command, (payload) => {
+            if (NcAsm.decodeNcAsm(payload).settled) finish(true);
+          })
+        );
+      }
+    });
   }
 
   /** The headset answered us, so we still have the control channel. */
@@ -375,6 +410,9 @@ export class Headphones {
       case CommandT1.NCASM_RET_PARAM:
       case CommandT1.NCASM_NTFY_PARAM: {
         const ncAsm = NcAsm.decodeNcAsm(frame.payload);
+        // A setting still in motion reports the value it is leaving behind. Adopting that
+        // would visibly bounce the UI back to the old mode, so wait for the settled frame.
+        if (!ncAsm.settled) break;
         this.state.ncAsm = ncAsm;
         // NTFY = the device pushed this unprompted (touch sensor, phone app, physical button).
         this.emit({ type: "ncAsm", state: ncAsm, origin: command === CommandT1.NCASM_NTFY_PARAM ? "device" : "local" });

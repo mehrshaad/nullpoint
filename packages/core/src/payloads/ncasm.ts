@@ -31,6 +31,12 @@ export interface NcAsmState {
   ambientMode: AmbientSoundMode;
   /** 0-20. */
   ambientLevel: number;
+  /**
+   * False while the headset is still moving to the new setting. Interim frames carry values
+   * that are on their way out, so treating them as final makes a freshly changed mode appear
+   * to snap back to the old one.
+   */
+  settled: boolean;
 }
 
 /**
@@ -44,6 +50,7 @@ export function decodeNcAsm(payload: Uint8Array): NcAsmState {
     mode: payload[4] as NcAsmMode,
     ambientMode: payload[5] as AmbientSoundMode,
     ambientLevel: payload[6]!,
+    settled: payload[2] === ValueChangeStatus.CHANGED,
   };
 }
 
