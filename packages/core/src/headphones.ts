@@ -233,9 +233,13 @@ export class Headphones {
     this.emit({ type: "controlLost" });
   }
 
-  async setEqPreset(preset: number): Promise<void> {
+  /**
+   * @param restoreBands values to apply along with a Custom selection. The headset does not
+   * remember a user curve across preset changes, so the app supplies the one it saved.
+   */
+  async setEqPreset(preset: number, restoreBands?: Eq.EqBands): Promise<void> {
     try {
-      const bands = this.state.eq?.bands;
+      const bands = restoreBands ?? this.state.eq?.bands;
       // Custom is not a stored curve on the headset — it *is* whatever band values you send it.
       // Selecting it with an empty band list is a no-op the device silently ignores, so send
       // the current values along with it. Named presets carry their own curve and take the

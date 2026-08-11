@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Headphones, HeadphonesState } from "@ssc/core";
-import { AmbientSoundMode, BatteryChargingStatus, noiseModeFromState } from "@ssc/core";
+import { AmbientSoundMode, BatteryChargingStatus, EqPresetId, noiseModeFromState } from "@ssc/core";
+import { customEqKey } from "../state/useSettings.js";
 import { TitleBar } from "./TitleBar.js";
 import { DeviceArt } from "../components/DeviceArt.js";
 import { NoiseModeSegmented } from "../components/NoiseModeSegmented.js";
@@ -17,6 +18,8 @@ export function Dashboard({
   reconnecting,
   reconnectReason = "gone",
   controlLost = false,
+  savedCustomEq,
+  onCustomEqChange,
   onCancelReconnect,
 }: {
   state: HeadphonesState;
@@ -27,6 +30,9 @@ export function Dashboard({
   reconnectReason?: "busy" | "gone";
   /** Link is up, but another device holds the control channel — see useHeadphones. */
   controlLost?: boolean;
+  /** Persisted user equalizer curves, keyed by customEqKey(). */
+  savedCustomEq?: Record<string, number[]>;
+  onCustomEqChange?: (key: string, values: number[]) => void;
   onCancelReconnect: () => void;
 }) {
   const battery = state.battery;
@@ -154,7 +160,11 @@ export function Dashboard({
                 gap: 5,
                 padding: "3px 7px",
                 borderRadius: 5,
-                background: reconnecting ? "var(--warn-bg)" : "var(--ok-bg)",
+                background: reconnecting
+                  ? "var(--warn-bg)"
+                  : controlLost
+                    ? "var(--amber-soft)"
+                    : "var(--ok-bg)",
               }}
             >
               <div
@@ -162,7 +172,7 @@ export function Dashboard({
                   width: 5,
                   height: 5,
                   borderRadius: "50%",
-                  background: reconnecting ? "var(--warn)" : "var(--ok)",
+                  background: reconnecting ? "var(--warn)" : controlLost ? "var(--amber)" : "var(--ok)",
                 }}
               />
               <div
@@ -171,10 +181,10 @@ export function Dashboard({
                   fontWeight: 500,
                   fontSize: 10,
                   letterSpacing: "0.1em",
-                  color: reconnecting ? "var(--warn)" : "var(--ok)",
+                  color: reconnecting ? "var(--warn)" : controlLost ? "var(--amber)" : "var(--ok)",
                 }}
               >
-                {reconnecting ? "LAST KNOWN" : "LINKED"}
+                {reconnecting ? "LAST KNOWN" : controlLost ? "NO CONTROL" : "LINKED"}
               </div>
             </div>
           </div>
@@ -271,14 +281,25 @@ export function Dashboard({
           <EqualizerPanel
             preset={state.eq.preset}
             bands={state.eq.bands}
-            onPresetChange={(preset) => void headphones.setEqPreset(preset)}
+            onPresetChange={(preset) => {
+              // Selecting Custom restores the curve the user built, which the headset itself
+              // does not remember — a named preset overwrites the bands outright.
+              const layout = state.eq?.bands?.layout;
+              const saved = layout ? savedCustomEq?.[customEqKey(state.modelName, layout)] : undefined;
+              const restore =
+                preset === EqPresetId.CUSTOM && saved && layout
+                  ? { layout, values: saved }
+                  : undefined;
+              void headphones.setEqPreset(preset, restore);
+            }}
             onBandChange={(index, value) => {
-              // EqualizerPanel only makes band sliders interactive when the preset is editable,
-              // so this cannot fire without bands already present.
               const current = state.eq?.bands;
               if (!current) return;
               const values = [...current.values];
               values[index] = value;
+              // Remember it: this is the user's own curve, and the device will lose it the
+              // moment a preset is chosen.
+              onCustomEqChange?.(customEqKey(state.modelName, current.layout), values);
               void headphones.setEqBands({ ...current, values });
             }}
           />

@@ -12,6 +12,17 @@ export interface AppSettings {
   reconnectAutomatically: boolean;
   showSoundPressure: boolean;
   theme: "system" | "dark" | "light";
+  /**
+   * The user's own equalizer curve, kept here rather than on the headset.
+   *
+   * The device has no memory of "the curve you had before you tried Clear" — selecting a named
+   * preset overwrites the band values outright. Storing it means switching to a preset and back
+   * to Custom restores what the user built instead of whatever the last preset left behind.
+   *
+   * Keyed by model and layout, since a 10-band graphic curve is meaningless on a Clear-Bass
+   * device and vice versa.
+   */
+  customEq: Record<string, number[]>;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -21,7 +32,13 @@ export const DEFAULT_SETTINGS: AppSettings = {
   reconnectAutomatically: true,
   showSoundPressure: false,
   theme: "system",
+  customEq: {},
 };
+
+/** Stable key for a saved curve: the same model can report different band layouts. */
+export function customEqKey(model: string | null | undefined, layout: string): string {
+  return `${model ?? "unknown"}:${layout}`;
+}
 
 interface NullpointBridge {
   isDesktop: true;

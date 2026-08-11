@@ -12,6 +12,8 @@ export interface DesktopSettings {
   reconnectAutomatically: boolean;
   showSoundPressure: boolean;
   theme: "system" | "dark" | "light";
+  /** User equalizer curves, keyed by model and band layout. Mirrors AppSettings in the web app. */
+  customEq: Record<string, number[]>;
 }
 
 export const DEFAULT_SETTINGS: DesktopSettings = {
@@ -21,6 +23,7 @@ export const DEFAULT_SETTINGS: DesktopSettings = {
   reconnectAutomatically: true,
   showSoundPressure: false,
   theme: "system",
+  customEq: {},
 };
 
 function settingsPath(): string {

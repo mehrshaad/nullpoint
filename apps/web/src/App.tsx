@@ -47,6 +47,10 @@ export function App() {
           reconnecting={connection.status === "reconnecting"}
           reconnectReason={connection.status === "reconnecting" ? connection.reason : undefined}
           controlLost={controlLost}
+          savedCustomEq={settings.customEq}
+          onCustomEqChange={(key, values) =>
+            void update({ customEq: { ...settings.customEq, [key]: values } })
+          }
           onCancelReconnect={reset}
         />
       ) : (

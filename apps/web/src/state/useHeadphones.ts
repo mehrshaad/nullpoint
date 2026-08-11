@@ -96,6 +96,8 @@ export function useHeadphones({ autoReconnect = true }: { autoReconnect?: boolea
     const transport = new WebSerialTransport(port);
     const headphones = new Headphones(transport);
     headphonesRef.current = headphones;
+    // Reconnecting produces a new session, so any earlier loss of control no longer applies.
+    setControlLost(false);
     headphones.on((event) => {
       setDeviceState({ ...headphones.state });
       if (event.type === "controlLost") setControlLost(true);
