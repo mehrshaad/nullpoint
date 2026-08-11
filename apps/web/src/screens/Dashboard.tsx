@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { EqBands, Headphones, HeadphonesState } from "@ssc/core";
+import type { Headphones, HeadphonesState } from "@ssc/core";
 import { AmbientSoundMode, BatteryChargingStatus, noiseModeFromState } from "@ssc/core";
 import { TitleBar } from "./TitleBar.js";
 import { DeviceArt } from "../components/DeviceArt.js";
@@ -238,19 +238,14 @@ export function Dashboard({
             preset={state.eq.preset}
             bands={state.eq.bands}
             onPresetChange={(preset) => void headphones.setEqPreset(preset)}
-            onBandChange={(key, value) => {
-              // EqualizerPanel only makes band sliders interactive when preset === CUSTOM
-              // (the only preset the XM6 accepts arbitrary values for — PLAN.md §3), so this
-              // never fires for a non-Custom preset; no separate "switch to Custom" step needed.
-              const current: EqBands = state.eq?.bands ?? {
-                clearBass: 0,
-                band400: 0,
-                band1k: 0,
-                band2_5k: 0,
-                band6_3k: 0,
-                band16k: 0,
-              };
-              void headphones.setEqBands({ ...current, [key]: value });
+            onBandChange={(index, value) => {
+              // EqualizerPanel only makes band sliders interactive when the preset is editable,
+              // so this cannot fire without bands already present.
+              const current = state.eq?.bands;
+              if (!current) return;
+              const values = [...current.values];
+              values[index] = value;
+              void headphones.setEqBands({ ...current, values });
             }}
           />
         ) : (

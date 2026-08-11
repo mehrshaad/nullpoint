@@ -127,7 +127,8 @@ describe("Headphones.connect() over a fake device", () => {
     });
     expect(state.eq).toEqual({
       preset: EqPresetId.CUSTOM,
-      bands: { clearBass: 3, band400: 2, band1k: 0, band2_5k: -2, band6_3k: 3, band16k: 5 },
+      // 6 steps -> the Clear Bass + 5 band layout, decoded with the +10 offset.
+      bands: { layout: "clearBass5", values: [3, 2, 0, -2, 3, 5] },
     });
   });
 
@@ -167,6 +168,65 @@ describe("Headphones.connect() over a fake device", () => {
     expect(events).toEqual([{ type: "eq", state: hp.state.eq, origin: "device" }]);
   });
 
+  it("acknowledges every frame the device sends, with the inverted sequence number", async () => {
+    const transport = new LoopbackTransport(createFakeDevice());
+    const hp = new Headphones(transport);
+    await hp.connect();
+
+    const sent = transport.sent.map((f) => decodeFrameBody(f.subarray(1, f.length - 1)));
+    const deviceFrames = sent.filter((f) => f.dataType === DataType.DATA_MDR);
+    const acks = sent.filter((f) => f.dataType === DataType.ACK);
+
+    // The headset stops replying if we don't ACK, so there must be one ACK per frame it sent.
+    // The fake device answers every command, so that is one ACK per command we issued.
+    expect(acks.length).toBe(deviceFrames.length);
+    // ACKs carry the inverse of the received sequence number (BluetoothWrapper::sendAck).
+    for (const ack of acks) expect([0, 1]).toContain(ack.seq);
+    expect(acks.every((a) => a.payload.length === 0)).toBe(true);
+  });
+
+  it("decodes the 10-band graphic EQ a WH-1000XM6 on FW 3.1.5 reports", async () => {
+    const transport = new LoopbackTransport(createFakeDevice());
+    const hp = new Headphones(transport);
+    await hp.connect();
+
+    // 10 steps use a +6 offset and a -6..+6 range, unlike the 6-step Clear Bass shape.
+    const steps = [6, 7, 5, 6, 8, 6, 4, 6, 9, 6];
+    transport.emit(
+      packageDataForBt(
+        DataType.DATA_MDR,
+        0,
+        Uint8Array.from([CommandT1.EQEBB_NTFY_PARAM, EqEbbInquiredType.PRESET_EQ, EqPresetId.CUSTOM, 10, ...steps])
+      )
+    );
+    expect(hp.state.eq?.bands).toEqual({
+      layout: "graphic10",
+      values: [0, 1, -1, 0, 2, 0, -2, 0, 3, 0],
+    });
+  });
+
+  it("ignores an EQ shape it doesn't recognise instead of tearing down the session", async () => {
+    const transport = new LoopbackTransport(createFakeDevice());
+    const hp = new Headphones(transport);
+    await hp.connect();
+
+    // A frame we cannot interpret must not kill the connection — it arrives on the read loop.
+    expect(() =>
+      transport.emit(
+        packageDataForBt(
+          DataType.DATA_MDR,
+          0,
+          Uint8Array.from([CommandT1.EQEBB_NTFY_PARAM, EqEbbInquiredType.PRESET_EQ, EqPresetId.CUSTOM, 7, 1, 2, 3, 4, 5, 6, 7])
+        )
+      )
+    ).not.toThrow();
+    expect(hp.state.eq?.bands).toBeNull();
+
+    // ...and the session still works afterwards.
+    await hp.setNoiseMode("ambient");
+    expect(hp.state.ncAsm?.mode).toBe(NcAsmMode.ASM);
+  });
+
   it("emits 'disconnected' when the transport link drops", async () => {
     const transport = new LoopbackTransport(createFakeDevice());
     const hp = new Headphones(transport);
@@ -185,8 +245,11 @@ describe("Headphones.connect() over a fake device", () => {
 
     await hp.setAmbientLevel(0);
     // the wire message sent to the device was clamped to 1 (Headphones.cpp:191)...
-    const lastSent = transport.sent[transport.sent.length - 1];
-    const { payload } = decodeFrameBody(lastSent.subarray(1, lastSent.length - 1));
+    // Skip the ACKs we now send for the device's own frames; we want the last real command.
+    const commands = transport.sent
+      .map((f) => decodeFrameBody(f.subarray(1, f.length - 1)))
+      .filter((f) => f.dataType === DataType.DATA_MDR);
+    const { payload } = commands[commands.length - 1]!;
     expect(payload[6]).toBe(1);
     // ...and the fake device's NTFY echo reconciles local state to what it actually accepted
     expect(hp.state.ncAsm?.ambientLevel).toBe(1);

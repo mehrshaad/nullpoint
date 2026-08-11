@@ -57,7 +57,15 @@ export class Headphones {
 
   constructor(private transport: Transport) {
     transport.onData((bytes) => {
-      for (const frame of this.reassembler.push(bytes)) this.handleFrame(frame);
+      for (const frame of this.reassembler.push(bytes)) {
+        // One frame we cannot interpret must never take down the connection: this runs on the
+        // transport's read loop, so an escaping throw would end the session outright.
+        try {
+          this.handleFrame(frame);
+        } catch (err) {
+          console.warn("[ssc/core] failed to handle a device frame; ignoring it:", err);
+        }
+      }
     });
     transport.onDisconnect(() => this.emit({ type: "disconnected" }));
   }
@@ -162,11 +170,17 @@ export class Headphones {
     }
   }
 
-  /** Send a command and wait for the ACK the device sends for every command frame. */
+  /**
+   * Send a command and wait for the ACK the device sends for every command frame.
+   *
+   * The sequence number is driven by the device, not toggled locally: every frame we receive
+   * updates `this.seq` (see handleFrame), and outgoing commands carry whatever it last was.
+   * That mirrors BluetoothWrapper::recvCommand/sendCommand upstream — toggling it ourselves
+   * drifts out of step with the headset and it stops replying.
+   */
   private async send(dataType: DataType, data: Uint8Array): Promise<void> {
     for (let attempt = 0; attempt < MAX_SEND_ATTEMPTS; attempt++) {
-      const seq = this.seq;
-      const frame = packageDataForBt(dataType, seq, data);
+      const frame = packageDataForBt(dataType, this.seq, data);
       const ackPromise = new Promise<void>((resolve) => {
         this.pendingAck = resolve;
       });
@@ -176,12 +190,24 @@ export class Headphones {
         new Promise<boolean>((resolve) => setTimeout(() => resolve(true), ACK_TIMEOUT_MS)),
       ]);
       this.pendingAck = null;
-      if (!timedOut) {
-        this.seq = seq ^ 1; // PLAN.md §4.3 — SEQ toggles 0/1 per sent command
-        return;
-      }
+      if (!timedOut) return;
     }
     throw new Error("No ACK received after retries");
+  }
+
+  /**
+   * Acknowledge a frame from the headset. This is not optional: the device waits for our ACK
+   * before it will send anything further, so skipping it stalls the session after the first
+   * reply. The ACK carries the inverse of the received sequence number
+   * (BluetoothWrapper::sendAck upstream), and is fire-and-forget — ACKs are never themselves
+   * acknowledged, so this must not go through send().
+   */
+  private async sendAck(receivedSeq: number): Promise<void> {
+    try {
+      await this.transport.write(packageDataForBt(DataType.ACK, 1 - receivedSeq, new Uint8Array(0)));
+    } catch (err) {
+      console.warn("[ssc/core] failed to ACK a device frame:", err);
+    }
   }
 
   /** Send a command and wait for its typed RET response (not just the ACK). */
@@ -214,11 +240,17 @@ export class Headphones {
   }
 
   private handleFrame(frame: DecodedFrame): void {
+    // Every frame the headset sends advances the shared sequence number.
+    this.seq = frame.seq;
+
     if (frame.dataType === DataType.ACK) {
       this.pendingAck?.();
       return;
     }
     if (frame.dataType !== DataType.DATA_MDR || frame.payload.length === 0) return;
+
+    // Acknowledge before handling: the device will not send its next frame until we do.
+    void this.sendAck(frame.seq);
 
     const command = frame.payload[0] as CommandT1;
     for (const cb of this.rawResponseListeners.get(command) ?? []) cb(frame.payload);

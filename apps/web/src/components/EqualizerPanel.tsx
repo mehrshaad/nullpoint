@@ -1,11 +1,15 @@
-import { EqPresetId, type EqBands } from "@ssc/core";
+import { EQ_LAYOUTS, EqPresetId, type EqBands } from "@ssc/core";
 import { useLinearDrag } from "./useLinearDrag.js";
 
 /**
- * design/Dashboard.dc.html §1e "EqualizerPanel". Presets limited to Heavy/Clear/Hard/Soft/Custom
- * — the only ones the WH-1000XM6 FW 3.0.0 EQ accepts (PLAN.md §3, mos9527 PR #48).
+ * design/SoundConnect Desktop.dc.html §1e "EqualizerPanel".
+ *
+ * The band count, labels and dB range all come from whichever layout the headset reported —
+ * a WH-1000XM6 on firmware 3.1.5 sends the 10-band graphic shape, older units send Clear Bass
+ * plus 5 bands — so nothing here is hard-coded to one of them.
  */
 const PRESETS: Array<{ id: EqPresetId; label: string }> = [
+  { id: EqPresetId.OFF, label: "Off" },
   { id: EqPresetId.HEAVY, label: "Heavy" },
   { id: EqPresetId.CLEAR, label: "Clear" },
   { id: EqPresetId.HARD, label: "Hard" },
@@ -13,30 +17,24 @@ const PRESETS: Array<{ id: EqPresetId; label: string }> = [
   { id: EqPresetId.CUSTOM, label: "Custom" },
 ];
 
-const BANDS: Array<{ key: keyof EqBands; label: string; aria: string }> = [
-  { key: "clearBass", label: "CLEAR\nBASS", aria: "Clear Bass" },
-  { key: "band400", label: "400", aria: "400 hertz band" },
-  { key: "band1k", label: "1k", aria: "1 kilohertz band" },
-  { key: "band2_5k", label: "2.5k", aria: "2.5 kilohertz band" },
-  { key: "band6_3k", label: "6.3k", aria: "6.3 kilohertz band" },
-  { key: "band16k", label: "16k", aria: "16 kilohertz band" },
-];
-
 function BandSlider({
   value,
-  aria,
   label,
+  min,
+  max,
   editable,
   onChange,
 }: {
   value: number;
-  aria: string;
   label: string;
+  min: number;
+  max: number;
   editable: boolean;
   onChange: (v: number) => void;
 }) {
-  const drag = useLinearDrag(-10, 10, onChange);
-  const frac = (value + 10) / 20;
+  const drag = useLinearDrag(min, max, onChange);
+  const frac = (value - min) / (max - min);
+  const aria = label.replace("\n", " ");
 
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 8, minWidth: 0, opacity: editable ? 1 : 0.5 }}>
@@ -47,8 +45,8 @@ function BandSlider({
         role="slider"
         tabIndex={editable ? 0 : -1}
         aria-label={aria}
-        aria-valuemin={-10}
-        aria-valuemax={10}
+        aria-valuemin={min}
+        aria-valuemax={max}
         aria-valuenow={value}
         aria-disabled={!editable}
         onPointerDown={editable ? (e) => drag.onPointerDown(e, true) : undefined}
@@ -93,7 +91,10 @@ function BandSlider({
           }}
         />
       </div>
-      <div className="mono" style={{ fontSize: 10, letterSpacing: "0.04em", color: "var(--fg3)", textAlign: "center", whiteSpace: "pre" }}>
+      <div
+        className="mono"
+        style={{ fontSize: 10, letterSpacing: "0.04em", color: "var(--fg3)", textAlign: "center", whiteSpace: "pre" }}
+      >
         {label}
       </div>
     </div>
@@ -109,20 +110,26 @@ export function EqualizerPanel({
   preset: EqPresetId;
   bands: EqBands | null;
   onPresetChange: (preset: EqPresetId) => void;
-  onBandChange: (key: keyof EqBands, value: number) => void;
+  /** index is the band's position in the device's own order. */
+  onBandChange: (index: number, value: number) => void;
 }) {
-  const editable = preset === EqPresetId.CUSTOM;
+  const spec = bands ? EQ_LAYOUTS[bands.layout] : null;
+  // Presets compute their own curve; only Custom takes arbitrary band values.
+  const editable = preset === EqPresetId.CUSTOM && Boolean(bands);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 15, border: "1px solid var(--line)", borderRadius: 12, background: "var(--panel)" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: 16 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 15, border: "1px solid var(--line)", borderRadius: 12, background: "var(--panel)", minWidth: 0 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: 16, gap: 10 }}>
         <div className="mono" style={{ fontWeight: 600, fontSize: 11, letterSpacing: "0.14em", color: "var(--fg3)" }}>
           EQUALIZER
         </div>
-        <div className="mono" style={{ fontSize: 10, color: "var(--fg3)" }}>
-          {editable ? "DRAG OR ARROW KEYS · dB" : "PRESET — SELECT CUSTOM TO EDIT"}
+        <div className="mono" style={{ fontSize: 10, color: "var(--fg3)", textAlign: "right" }}>
+          {editable
+            ? `DRAG OR ARROW KEYS · ${spec?.min}…+${spec?.max} dB`
+            : "PRESET — SELECT CUSTOM TO EDIT"}
         </div>
       </div>
+
       <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
         {PRESETS.map((p) => {
           const on = preset === p.id;
@@ -158,18 +165,29 @@ export function EqualizerPanel({
           );
         })}
       </div>
-      <div style={{ flex: 1, minHeight: 0, display: "flex", alignItems: "stretch", gap: 6, paddingTop: 4 }}>
-        {BANDS.map((b) => (
-          <BandSlider
-            key={b.key}
-            value={bands?.[b.key] ?? 0}
-            aria={b.aria}
-            label={b.label}
-            editable={editable}
-            onChange={(v) => onBandChange(b.key, v)}
-          />
-        ))}
-      </div>
+
+      {bands && spec ? (
+        <div style={{ flex: 1, minHeight: 0, display: "flex", alignItems: "stretch", gap: 4, paddingTop: 4 }}>
+          {bands.values.map((value, i) => (
+            <BandSlider
+              key={i}
+              value={value}
+              label={spec.labels[i] ?? String(i + 1)}
+              min={spec.min}
+              max={spec.max}
+              editable={editable}
+              onChange={(v) => onBandChange(i, v)}
+            />
+          ))}
+        </div>
+      ) : (
+        <div
+          className="mono"
+          style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10.5, color: "var(--fg3)", textAlign: "center" }}
+        >
+          THIS PRESET HAS NO ADJUSTABLE BANDS
+        </div>
+      )}
     </div>
   );
 }
