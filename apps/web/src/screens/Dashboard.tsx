@@ -95,7 +95,10 @@ export function Dashboard({
         </div>
       )}
 
-      <div style={{ flex: "none", display: "flex", alignItems: "center", gap: 16, padding: "18px 20px 16px" }}>
+      <div
+        className="dashboard-measure"
+        style={{ flex: "none", display: "flex", alignItems: "center", gap: 16, padding: "18px 20px 16px" }}
+      >
         <div
           style={{
             width: 52,
@@ -191,10 +194,13 @@ export function Dashboard({
       </div>
 
       <div
-        className="dashboard-grid"
+        className="dashboard-grid dashboard-measure"
         style={{
           flex: 1,
           minHeight: 0,
+          // Panels size to their content and sit at the top rather than stretching to fill a
+          // tall window, which is what turned the EQ into a wall of ribbons.
+          alignContent: "start",
           gap: 14,
           padding: "0 20px 20px",
           opacity: reconnecting ? 0.6 : 1,

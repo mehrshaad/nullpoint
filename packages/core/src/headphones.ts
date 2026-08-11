@@ -1,7 +1,7 @@
 // Ported from mos9527/SonyHeadphonesClient (MIT) — see /NOTICE.
 // Orchestration source: src/Headphones.{h,cpp} @ master (selectively — see PLAN.md §6 porting map).
 
-import { CommandT1, DataType, DeviceInfoType, PowerInquiredType } from "./constants.js";
+import { CommandT1, DataType, DeviceInfoType, EqPresetId, PowerInquiredType } from "./constants.js";
 import { FrameReassembler, packageDataForBt, type DecodedFrame } from "./framing.js";
 import type { Transport } from "./transport.js";
 import * as Init from "./payloads/init.js";
@@ -149,7 +149,16 @@ export class Headphones {
 
   async setEqPreset(preset: number): Promise<void> {
     try {
-      await this.send(DataType.DATA_MDR, Eq.encodeSetPreset(preset));
+      const bands = this.state.eq?.bands;
+      // Custom is not a stored curve on the headset — it *is* whatever band values you send it.
+      // Selecting it with an empty band list is a no-op the device silently ignores, so send
+      // the current values along with it. Named presets carry their own curve and take the
+      // preset-only form.
+      const command =
+        preset === EqPresetId.CUSTOM && bands
+          ? Eq.encodeSetBands(preset, bands)
+          : Eq.encodeSetPreset(preset);
+      await this.send(DataType.DATA_MDR, command);
       // Upstream always follows a preset change with a fresh GET (Headphones.cpp:307-308) —
       // the device recomputes band values for the new preset and we need those, not a guess.
       await this.request(DataType.DATA_MDR, Eq.encodeGetEq(), CommandT1.EQEBB_RET_PARAM);

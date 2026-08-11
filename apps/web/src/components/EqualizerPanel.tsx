@@ -57,6 +57,9 @@ function BandSlider({
           maxWidth: 34,
           flex: 1,
           minHeight: 96,
+          // Without a ceiling these grow with the window and become unusable ribbons on a
+          // tall or ultrawide display.
+          maxHeight: 260,
           borderRadius: 8,
           background: "var(--track)",
           border: "1px solid var(--line)",

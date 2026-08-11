@@ -94,3 +94,12 @@ button {
     grid-template-columns: 1fr;
   }
 }
+
+/* Upper bound as well as a lower one: on an ultrawide the panels would otherwise stretch the
+   full width of the display, leaving the controls marooned in dead space. The content column
+   stays a readable width and centres itself. */
+.dashboard-measure {
+  width: 100%;
+  max-width: 1240px;
+  margin-inline: auto;
+}
