@@ -41,6 +41,11 @@ mac:
   # Menu-bar resident: main.ts hides the Dock icon while no window is open.
   extendInfo:
     LSUIElement: false
+  # We have no Apple identity, so electron-builder skips signing; scripts/adhoc-sign.cjs then
+  # ad-hoc signs the bundle, without which Apple Silicon refuses to launch it at all.
+  identity: null
+
+afterPack: scripts/adhoc-sign.cjs
 
 linux:
   target: [AppImage]

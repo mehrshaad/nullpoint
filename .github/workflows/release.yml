@@ -50,8 +50,9 @@ jobs:
 
       - name: Package
         working-directory: apps/desktop
-        # No signing identity is configured, so tell electron-builder not to go looking for one;
-        # otherwise the macOS build fails instead of producing an unsigned app.
+        # No Apple identity, so don't let electron-builder hunt for one. The macOS bundle is
+        # then ad-hoc signed by scripts/adhoc-sign.cjs, without which Apple Silicon will not
+        # launch an entirely unsigned arm64 app.
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
         run: pnpm exec electron-builder --config electron-builder.yml ${{ matrix.args }}
