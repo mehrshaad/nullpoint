@@ -10,7 +10,7 @@ import { Settings } from "./screens/Settings.js";
 
 export function App() {
   const { settings, update, isDesktop } = useSettings();
-  const { connection, deviceState, connect, reset, headphones } = useHeadphones({
+  const { connection, deviceState, controlLost, connect, reset, headphones } = useHeadphones({
     autoReconnect: settings.reconnectAutomatically,
   });
   const [showSettings, setShowSettings] = useState(false);
@@ -45,6 +45,7 @@ export function App() {
           headphones={headphones}
           onSettingsClick={() => setShowSettings(true)}
           reconnecting={connection.status === "reconnecting"}
+          controlLost={controlLost}
           onCancelReconnect={reset}
         />
       ) : (

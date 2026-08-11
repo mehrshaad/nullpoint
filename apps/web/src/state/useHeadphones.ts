@@ -69,6 +69,12 @@ export function useHeadphones({ autoReconnect = true }: { autoReconnect?: boolea
     WebSerialTransport.isSupported() ? { status: "idle" } : { status: "unsupported" }
   );
   const [deviceState, setDeviceState] = useState<HeadphonesState | null>(null);
+  /**
+   * The link is up but the headset is refusing commands — another device (usually a phone on
+   * multipoint) holds the control channel. Distinct from disconnected: nothing to reconnect,
+   * and it clears by itself once the other device lets go.
+   */
+  const [controlLost, setControlLost] = useState(false);
   const headphonesRef = useRef<Headphones | null>(null);
   const attemptReconnectRef = useRef<(port: SerialPort) => void>(() => {});
   const cancelledRef = useRef(false);
@@ -83,6 +89,8 @@ export function useHeadphones({ autoReconnect = true }: { autoReconnect?: boolea
     headphonesRef.current = headphones;
     headphones.on((event) => {
       setDeviceState({ ...headphones.state });
+      if (event.type === "controlLost") setControlLost(true);
+      if (event.type === "controlRegained") setControlLost(false);
       if (event.type !== "disconnected") return;
       if (autoReconnectRef.current) {
         attemptReconnectRef.current(port);
@@ -123,6 +131,7 @@ export function useHeadphones({ autoReconnect = true }: { autoReconnect?: boolea
 
   const connect = useCallback(async () => {
     setConnection({ status: "connecting" });
+    setControlLost(false);
     try {
       // Must be called directly from the click handler's call stack — Web Serial requires a
       // user gesture for requestPort(). PLAN.md §5.2.
@@ -140,10 +149,11 @@ export function useHeadphones({ autoReconnect = true }: { autoReconnect?: boolea
 
   const reset = useCallback(() => {
     cancelledRef.current = true; // stop any in-flight reconnect loop from clobbering this reset
+    setControlLost(false);
     setConnection({ status: "idle" });
     setDeviceState(null);
     headphonesRef.current = null;
   }, []);
 
-  return { connection, deviceState, connect, reset, headphones: headphonesRef.current };
+  return { connection, deviceState, controlLost, connect, reset, headphones: headphonesRef.current };
 }

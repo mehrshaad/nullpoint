@@ -26,83 +26,96 @@ function ack(): Uint8Array {
   return packageDataForBt(DataType.ACK, 0, Uint8Array.from([]));
 }
 
-/** A fake WH-1000XM6 that answers the v1 connect handshake + feature gets. */
+/**
+ * A fake WH-1000XM6 that answers the v1 connect handshake and feature gets.
+ *
+ * It remembers what it was told, because the client reads state back after every write — a
+ * stateless stub would report defaults and make correct code look broken.
+ */
 function createFakeDevice() {
+  const state = {
+    ncAsm: {
+      onOff: OnOff.ON as number,
+      mode: NcAsmMode.NC as number,
+      ambientMode: AmbientSoundMode.NORMAL as number,
+      level: 12,
+    },
+    eqPreset: EqPresetId.CUSTOM as number,
+    eqSteps: [13, 12, 10, 8, 13, 15],
+  };
+
   return (sent: Uint8Array) => {
     const { payload } = decodeFrameBody(sent.subarray(1, sent.length - 1));
     const command = payload[0] as CommandT1;
     const replies: Uint8Array[] = [ack()];
+    const mdr = (bytes: number[]) => packageDataForBt(DataType.DATA_MDR, 0, Uint8Array.from(bytes));
 
     switch (command) {
       case CommandT1.CONNECT_GET_PROTOCOL_INFO:
-        replies.push(
-          packageDataForBt(
-            DataType.DATA_MDR,
-            0,
-            Uint8Array.from([CommandT1.CONNECT_RET_PROTOCOL_INFO, ConnectInquiredType.FIXED_VALUE, 0, 0, 0, 2, 0, 1])
-          )
-        );
+        replies.push(mdr([CommandT1.CONNECT_RET_PROTOCOL_INFO, ConnectInquiredType.FIXED_VALUE, 0, 0, 0, 2, 0, 1]));
         break;
       case CommandT1.CONNECT_GET_DEVICE_INFO: {
         const type = payload[1] as DeviceInfoType;
-        const value = type === DeviceInfoType.MODEL_NAME ? "WH-1000XM6" : "2.0.1";
-        const bytes = textBytes(value);
-        replies.push(
-          packageDataForBt(
-            DataType.DATA_MDR,
-            0,
-            Uint8Array.from([CommandT1.CONNECT_RET_DEVICE_INFO, type, bytes.length, ...bytes])
-          )
-        );
+        const bytes = textBytes(type === DeviceInfoType.MODEL_NAME ? "WH-1000XM6" : "2.0.1");
+        replies.push(mdr([CommandT1.CONNECT_RET_DEVICE_INFO, type, bytes.length, ...bytes]));
         break;
       }
       case CommandT1.CONNECT_GET_SUPPORT_FUNCTION:
-        replies.push(
-          packageDataForBt(
-            DataType.DATA_MDR,
-            0,
-            Uint8Array.from([CommandT1.CONNECT_RET_SUPPORT_FUNCTION, ConnectInquiredType.FIXED_VALUE, 2, 0x20, 0, 0x6b, 0])
-          )
-        );
+        replies.push(mdr([CommandT1.CONNECT_RET_SUPPORT_FUNCTION, ConnectInquiredType.FIXED_VALUE, 2, 0x20, 0, 0x6b, 0]));
         break;
       case CommandT1.POWER_GET_STATUS:
+        replies.push(mdr([CommandT1.POWER_RET_STATUS, PowerInquiredType.BATTERY, 78, BatteryChargingStatus.NOT_CHARGING]));
+        break;
+
+      case CommandT1.NCASM_SET_PARAM:
+        state.ncAsm = {
+          onOff: payload[3]!,
+          mode: payload[4]!,
+          ambientMode: payload[5]!,
+          level: payload[6]!,
+        };
         replies.push(
-          packageDataForBt(
-            DataType.DATA_MDR,
-            0,
-            Uint8Array.from([CommandT1.POWER_RET_STATUS, PowerInquiredType.BATTERY, 78, BatteryChargingStatus.NOT_CHARGING])
-          )
+          mdr([
+            CommandT1.NCASM_NTFY_PARAM,
+            NcAsmInquiredType.MODE_NC_ASM_DUAL_NC_MODE_SWITCH_AND_ASM_SEAMLESS,
+            ValueChangeStatus.CHANGED,
+            state.ncAsm.onOff,
+            state.ncAsm.mode,
+            state.ncAsm.ambientMode,
+            state.ncAsm.level,
+          ])
         );
         break;
       case CommandT1.NCASM_GET_PARAM:
-      case CommandT1.NCASM_SET_PARAM:
         replies.push(
-          packageDataForBt(
-            DataType.DATA_MDR,
-            0,
-            Uint8Array.from([
-              command === CommandT1.NCASM_GET_PARAM ? CommandT1.NCASM_RET_PARAM : CommandT1.NCASM_NTFY_PARAM,
-              NcAsmInquiredType.MODE_NC_ASM_DUAL_NC_MODE_SWITCH_AND_ASM_SEAMLESS,
-              ValueChangeStatus.CHANGED,
-              command === CommandT1.NCASM_SET_PARAM ? payload[3] : OnOff.ON,
-              command === CommandT1.NCASM_SET_PARAM ? payload[4] : NcAsmMode.NC,
-              command === CommandT1.NCASM_SET_PARAM ? payload[5] : AmbientSoundMode.NORMAL,
-              command === CommandT1.NCASM_SET_PARAM ? payload[6] : 12,
-            ])
-          )
+          mdr([
+            CommandT1.NCASM_RET_PARAM,
+            NcAsmInquiredType.MODE_NC_ASM_DUAL_NC_MODE_SWITCH_AND_ASM_SEAMLESS,
+            ValueChangeStatus.CHANGED,
+            state.ncAsm.onOff,
+            state.ncAsm.mode,
+            state.ncAsm.ambientMode,
+            state.ncAsm.level,
+          ])
         );
         break;
+
+      case CommandT1.EQEBB_SET_PARAM: {
+        state.eqPreset = payload[2]!;
+        const count = payload[3]!;
+        if (count > 0) state.eqSteps = Array.from(payload.subarray(4, 4 + count));
+        break; // ACK only — the client re-GETs, per Headphones.cpp:307-308
+      }
       case CommandT1.EQEBB_GET_PARAM:
         replies.push(
-          packageDataForBt(
-            DataType.DATA_MDR,
-            0,
-            Uint8Array.from([CommandT1.EQEBB_RET_PARAM, EqEbbInquiredType.PRESET_EQ, EqPresetId.CUSTOM, 6, 13, 12, 10, 8, 13, 15])
-          )
+          mdr([
+            CommandT1.EQEBB_RET_PARAM,
+            EqEbbInquiredType.PRESET_EQ,
+            state.eqPreset,
+            state.eqSteps.length,
+            ...state.eqSteps,
+          ])
         );
-        break;
-      case CommandT1.EQEBB_SET_PARAM:
-        // ACK only — the client re-GETs after a preset change, per Headphones.cpp:307-308
         break;
     }
     return replies;
@@ -143,9 +156,13 @@ describe("Headphones.connect() over a fake device", () => {
     await hp.setNoiseMode("ambient");
     expect(hp.state.ncAsm?.mode).toBe(NcAsmMode.ASM);
     expect(hp.state.ncAsm?.totalEffectOn).toBe(true);
-    const ncAsmEvents = events.filter((e) => e.type === "ncAsm");
-    // one optimistic emit (origin: local) + one reconciled emit from the loopback NTFY (origin: device)
-    expect(ncAsmEvents.map((e) => e.origin)).toEqual(["local", "device"]);
+
+    const origins = events.filter((e) => e.type === "ncAsm").map((e) => e.origin);
+    // Paints optimistically first, then the device's own NTFY, then the read-back that makes
+    // the headset the final authority on what actually took effect.
+    expect(origins[0]).toBe("local");
+    expect(origins).toContain("device");
+    expect(origins.length).toBeGreaterThanOrEqual(2);
   });
 
   it("tags a device-initiated NTFY as origin: device, and connect()'s own RET as origin: local", async () => {
@@ -227,6 +244,29 @@ describe("Headphones.connect() over a fake device", () => {
     expect(hp.state.ncAsm?.mode).toBe(NcAsmMode.ASM);
   });
 
+  it("reverts the optimistic value and reports lost control when the headset stops answering", async () => {
+    // Reproduces what happens when a phone takes the control channel over multipoint: the link
+    // stays open, but commands go unanswered. The UI must not keep showing a mode the
+    // headphones were never actually in.
+    let deaf = false;
+    const device = createFakeDevice();
+    const transport = new LoopbackTransport((sent) => (deaf ? [] : device(sent)));
+    const hp = new Headphones(transport);
+    await hp.connect();
+
+    const before = hp.state.ncAsm;
+    const events: string[] = [];
+    hp.on((e) => events.push(e.type));
+
+    deaf = true;
+    await hp.setNoiseMode("ambient");
+
+    expect(hp.state.ncAsm).toEqual(before); // reverted, not left on the optimistic guess
+    expect(events).toContain("writeFailed");
+    expect(events).toContain("controlLost");
+    expect(hp.controllable).toBe(false);
+  }, 20_000);
+
   it("emits 'disconnected' when the transport link drops", async () => {
     const transport = new LoopbackTransport(createFakeDevice());
     const hp = new Headphones(transport);
@@ -245,12 +285,12 @@ describe("Headphones.connect() over a fake device", () => {
 
     await hp.setAmbientLevel(0);
     // the wire message sent to the device was clamped to 1 (Headphones.cpp:191)...
-    // Skip the ACKs we now send for the device's own frames; we want the last real command.
-    const commands = transport.sent
+    // Look for the SET specifically: we also send ACKs, and a GET read-back follows the write.
+    const sets = transport.sent
       .map((f) => decodeFrameBody(f.subarray(1, f.length - 1)))
-      .filter((f) => f.dataType === DataType.DATA_MDR);
-    const { payload } = commands[commands.length - 1]!;
-    expect(payload[6]).toBe(1);
+      .filter((f) => f.dataType === DataType.DATA_MDR && f.payload[0] === CommandT1.NCASM_SET_PARAM);
+    expect(sets.length).toBeGreaterThan(0);
+    expect(sets[sets.length - 1]!.payload[6]).toBe(1);
     // ...and the fake device's NTFY echo reconciles local state to what it actually accepted
     expect(hp.state.ncAsm?.ambientLevel).toBe(1);
   });

@@ -31,6 +31,13 @@ export type HeadphonesEvent =
   | { type: "eq"; state: Eq.EqState; origin: StateOrigin }
   | { type: "deviceInfo" }
   | { type: "writeFailed"; feature: "ncAsm" | "eq" }
+  /**
+   * The link is still open but the headset has stopped accepting commands — in practice
+   * because another device (usually a phone on multipoint) has taken the control channel.
+   * Distinct from "disconnected": there is nothing to reconnect, we just cannot steer it.
+   */
+  | { type: "controlLost" }
+  | { type: "controlRegained" }
   | { type: "disconnected" };
 
 const ACK_TIMEOUT_MS = 2000;
@@ -40,6 +47,8 @@ const MAX_SEND_ATTEMPTS = 3; // PLAN.md §4.3: retry-on-timeout
  * only on coarse steps. A slow poll keeps the reading honest without meaningful traffic.
  */
 const BATTERY_REFRESH_MS = 60_000;
+/** While another device holds control, probe often so we notice the moment it lets go. */
+const CONTROL_PROBE_MS = 4_000;
 
 /**
  * A single connected headset. Owns the frame reassembler and the send/ACK/retry loop;
@@ -131,17 +140,28 @@ export class Headphones {
   }
 
   private batteryTimer: ReturnType<typeof setInterval> | null = null;
+  private hasControl = true;
+
+  /** True while the headset is still accepting our commands. */
+  get controllable(): boolean {
+    return this.hasControl;
+  }
 
   private startBatteryRefresh(): void {
+    this.setBatteryInterval(BATTERY_REFRESH_MS);
+  }
+
+  /**
+   * One timer serves two purposes: keeping the battery reading fresh, and probing whether we
+   * still have the control channel. A reply proves both.
+   */
+  private setBatteryInterval(intervalMs: number): void {
     this.stopBatteryRefresh();
     this.batteryTimer = setInterval(() => {
-      // Fire and forget: the reply is picked up by handleFrame like any other status frame,
-      // and a failure here is not worth surfacing — the next tick will try again.
-      void this.send(
-        DataType.DATA_MDR,
-        Battery.encodeGetBattery(PowerInquiredType.BATTERY)
-      ).catch(() => {});
-    }, BATTERY_REFRESH_MS);
+      void this.send(DataType.DATA_MDR, Battery.encodeGetBattery(PowerInquiredType.BATTERY))
+        .then(() => this.noteResponsive())
+        .catch(() => this.noteControlLost());
+    }, intervalMs);
   }
 
   private stopBatteryRefresh(): void {
@@ -171,14 +191,46 @@ export class Headphones {
   }
 
   private async writeNcAsm(next: NcAsm.NcAsmState): Promise<void> {
-    // Optimistic update (PLAN.md §5.3 rule 1) — reconciled when the device NTFYs back.
+    const confirmed = this.state.ncAsm;
+    // Paint immediately (design §5.3 rule 1), but treat it as a guess until the headset says
+    // otherwise.
     this.state.ncAsm = next;
     this.emit({ type: "ncAsm", state: next, origin: "local" });
     try {
       await this.send(DataType.DATA_MDR, NcAsm.encodeSetNcAsm(next));
+      // Read back rather than trusting the write. The device is the source of truth, and this
+      // is what stops the UI showing a state the headphones were never in — which is exactly
+      // what happens when another device holds the control channel.
+      await this.request(DataType.DATA_MDR, NcAsm.encodeGetNcAsm(), CommandT1.NCASM_RET_PARAM);
+      this.noteResponsive();
     } catch {
+      // Put the last known-good value back rather than leaving the optimistic one on screen.
+      if (confirmed) {
+        this.state.ncAsm = confirmed;
+        this.emit({ type: "ncAsm", state: confirmed, origin: "device" });
+      }
       this.emit({ type: "writeFailed", feature: "ncAsm" });
+      this.noteControlLost();
     }
+  }
+
+  /** The headset answered us, so we still have the control channel. */
+  private noteResponsive(): void {
+    if (this.hasControl) return;
+    this.hasControl = true;
+    this.setBatteryInterval(BATTERY_REFRESH_MS);
+    this.emit({ type: "controlRegained" });
+  }
+
+  /**
+   * The headset stopped answering. Poll faster while in this state so that control is picked
+   * back up promptly once the other device lets go — the reply to the poll is what clears it.
+   */
+  private noteControlLost(): void {
+    if (!this.hasControl) return;
+    this.hasControl = false;
+    this.setBatteryInterval(CONTROL_PROBE_MS);
+    this.emit({ type: "controlLost" });
   }
 
   async setEqPreset(preset: number): Promise<void> {
@@ -195,21 +247,29 @@ export class Headphones {
       await this.send(DataType.DATA_MDR, command);
       // Upstream always follows a preset change with a fresh GET (Headphones.cpp:307-308) —
       // the device recomputes band values for the new preset and we need those, not a guess.
+      // It also reconciles the UI if the headset ignored the change.
       await this.request(DataType.DATA_MDR, Eq.encodeGetEq(), CommandT1.EQEBB_RET_PARAM);
+      this.noteResponsive();
     } catch {
       this.emit({ type: "writeFailed", feature: "eq" });
+      this.noteControlLost();
     }
   }
 
   async setEqBands(bands: Eq.EqBands): Promise<void> {
     if (!this.state.eq) throw new Error("setEqBands called before connect()");
-    const next: Eq.EqState = { preset: this.state.eq.preset, bands };
+    const confirmed = this.state.eq;
+    const next: Eq.EqState = { preset: confirmed.preset, bands };
     this.state.eq = next;
     this.emit({ type: "eq", state: next, origin: "local" });
     try {
       await this.send(DataType.DATA_MDR, Eq.encodeSetBands(next.preset, bands));
+      this.noteResponsive();
     } catch {
+      this.state.eq = confirmed;
+      this.emit({ type: "eq", state: confirmed, origin: "device" });
       this.emit({ type: "writeFailed", feature: "eq" });
+      this.noteControlLost();
     }
   }
 

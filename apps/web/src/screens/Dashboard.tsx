@@ -15,12 +15,15 @@ export function Dashboard({
   headphones,
   onSettingsClick,
   reconnecting,
+  controlLost = false,
   onCancelReconnect,
 }: {
   state: HeadphonesState;
   headphones: Headphones;
   onSettingsClick: () => void;
   reconnecting: boolean;
+  /** Link is up, but another device holds the control channel — see useHeadphones. */
+  controlLost?: boolean;
   onCancelReconnect: () => void;
 }) {
   const battery = state.battery;
@@ -92,6 +95,26 @@ export function Dashboard({
             CANCEL
           </button>
           <style>{"@keyframes np-pulse { 0% { opacity: .95 } 50% { opacity: .3 } 100% { opacity: .95 } }"}</style>
+        </div>
+      )}
+
+      {controlLost && !reconnecting && (
+        <div
+          style={{
+            flex: "none",
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            padding: "9px 20px",
+            background: "var(--amber-soft)",
+            borderBottom: "1px solid var(--amber)",
+          }}
+        >
+          <div style={{ width: 7, height: 7, borderRadius: "50%", flex: "none", background: "var(--amber)" }} />
+          <div style={{ fontWeight: 500, fontSize: 12, lineHeight: 1.35, color: "var(--amber)" }}>
+            Another device has control. These headphones take settings from one device at a
+            time — disconnect them from your phone and this reconnects on its own.
+          </div>
         </div>
       )}
 
@@ -203,8 +226,8 @@ export function Dashboard({
           alignContent: "start",
           gap: 14,
           padding: "0 20px 20px",
-          opacity: reconnecting ? 0.6 : 1,
-          pointerEvents: reconnecting ? "none" : "auto",
+          opacity: reconnecting || controlLost ? 0.6 : 1,
+          pointerEvents: reconnecting || controlLost ? "none" : "auto",
           transition: "opacity .18s ease",
         }}
       >
