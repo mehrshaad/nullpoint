@@ -22,13 +22,13 @@ export function ConnectFailed({
     <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "var(--bg)" }}>
       <TitleBar statusColor="var(--warn)" />
       <div
+        className="pad-x"
         style={{
           flex: 1,
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          padding: "0 80px",
         }}
       >
         <div

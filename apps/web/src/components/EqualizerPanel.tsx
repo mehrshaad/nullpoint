@@ -37,7 +37,7 @@ function BandSlider({
   const aria = label.replace("\n", " ");
 
   return (
-    <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 8, minWidth: 0, opacity: editable ? 1 : 0.5 }}>
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 8, minWidth: 26, opacity: editable ? 1 : 0.5 }}>
       <div className="mono" style={{ fontWeight: 600, fontSize: 11, color: editable ? "var(--fg)" : "var(--fg3)" }}>
         {value > 0 ? `+${value}` : value}
       </div>
@@ -170,7 +170,18 @@ export function EqualizerPanel({
       </div>
 
       {bands && spec ? (
-        <div style={{ flex: 1, minHeight: 0, display: "flex", alignItems: "stretch", gap: 4, paddingTop: 4 }}>
+        <div
+          style={{
+            flex: 1,
+            minHeight: 0,
+            display: "flex",
+            alignItems: "stretch",
+            gap: 4,
+            paddingTop: 4,
+            // Ten bands cannot fit a phone; let the row scroll rather than crushing the sliders.
+            overflowX: "auto",
+          }}
+        >
           {bands.values.map((value, i) => (
             <BandSlider
               key={i}

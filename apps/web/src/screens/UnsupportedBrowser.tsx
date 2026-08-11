@@ -28,13 +28,13 @@ export function UnsupportedBrowser() {
         </div>
       </div>
       <div
+        className="pad-x"
         style={{
           flex: 1,
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          padding: "0 80px",
         }}
       >
         <div

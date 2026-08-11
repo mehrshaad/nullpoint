@@ -7,13 +7,13 @@ export function ConnectIdle({ onConnect }: { onConnect: () => void }) {
     <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "var(--bg)" }}>
       <TitleBar />
       <div
+        className="pad-x"
         style={{
           flex: 1,
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          padding: "0 80px",
         }}
       >
         <div

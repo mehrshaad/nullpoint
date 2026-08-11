@@ -95,11 +95,24 @@ button {
   }
 }
 
-/* Upper bound as well as a lower one: on an ultrawide the panels would otherwise stretch the
-   full width of the display, leaving the controls marooned in dead space. The content column
-   stays a readable width and centres itself. */
-.dashboard-measure {
+/* Every screen needs an upper width bound as well as a lower one: on an ultrawide, content
+   would otherwise stretch the full width of the display and strand the controls in dead space.
+   Two widths — the dashboard is two columns of panels, everything else is a single column and
+   wants to be narrower for readability. */
+.measure {
   width: 100%;
   max-width: 1240px;
   margin-inline: auto;
+}
+
+.measure-narrow {
+  width: 100%;
+  max-width: 880px;
+  margin-inline: auto;
+}
+
+/* Horizontal padding that shrinks with the viewport, so the centred screens stay usable on a
+   phone instead of keeping their desktop gutters. */
+.pad-x {
+  padding-inline: clamp(20px, 6vw, 80px);
 }

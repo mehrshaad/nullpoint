@@ -10,7 +10,7 @@
 
 Sony's official "Sound Connect" app (Android/iOS only) talks to the headphones over a proprietary Bluetooth Classic RFCOMM channel to control ANC, ambient sound, EQ, and battery — audio itself is plain A2DP handled by the OS. Nullpoint reimplements that control channel for desktop and the web, using [Web Serial](https://developer.chrome.com/docs/capabilities/serial) to reach Bluetooth Classic RFCOMM (Web Bluetooth is BLE-only and can't do this).
 
-**Features:** device detection, live battery, noise-canceling / ambient-sound mode with a continuous ambient level slider and focus-on-voice, and the 5-band + Clear Bass equalizer (Heavy / Clear / Hard / Soft / Custom presets). The desktop app lives in the tray, can start at login without opening a window, and reconnects on its own. Verified against the WH-1000XM6.
+**Features:** device detection, live battery, noise-canceling / ambient-sound mode with a continuous ambient level slider and focus-on-voice, and the equalizer with Sony's presets. Both equalizer layouts are supported — Clear Bass plus 5 bands, and the 10-band graphic EQ newer firmware reports. Mode and EQ changes made on the headphones themselves appear in the app live. The desktop app lives in the tray, can start at login without opening a window, and reconnects on its own. Verified against a WH-1000XM6 on firmware 3.1.5.
 
 ## Screenshots
 
@@ -23,7 +23,7 @@ Sony's official "Sound Connect" app (Android/iOS only) talks to the headphones o
 | | |
 |---|---|
 | **Windows** | [Download the installer](https://github.com/mehrshaad/nullpoint/releases/latest) (NSIS, 64-bit). Unsigned, so SmartScreen will warn on first run. |
-| **macOS** | Runs and lives in the menu bar, but there is no signed build yet — [build from source](#getting-started). |
+| **macOS** | [Download the .dmg](https://github.com/mehrshaad/nullpoint/releases/latest) — Apple Silicon or Intel. Lives in the menu bar. Ad-hoc signed but not notarized, so right-click → Open the first time. |
 | **Browser** | [Open the web app](https://nullpoint.ali-dadashzadeh.ir/app). Chrome, Edge, Opera or Arc on desktop; Safari and Firefox don't implement Web Serial. |
 
 Either way, **pair the headphones in your OS Bluetooth settings first** — Nullpoint can't pair for you.
@@ -70,7 +70,7 @@ Two details worth knowing if you work on this:
 - **The desktop renderer is served over a custom `app://` scheme, not `file://`.** Vite emits absolute asset paths, and `navigator.serial` requires a secure context; registering the scheme as `secure` + `standard` solves both.
 - **Packages consume each other through built `.d.ts` files**, so `pnpm -r run build` must run before `typecheck` on a clean checkout.
 
-The wire protocol (frame markers, escaping, checksum, the MDR V2 command set) was ported from the reverse-engineering work in [`mos9527/SonyHeadphonesClient`](https://github.com/mos9527/SonyHeadphonesClient) and [`Plutoberth/SonyHeadphonesClient`](https://github.com/Plutoberth/SonyHeadphonesClient) (both MIT) — see [`NOTICE`](./NOTICE) for attribution and [`PLAN.md`](./PLAN.md) for byte-level protocol documentation.
+The wire protocol (frame markers, escaping, checksum, the MDR V2 command set) was ported from the reverse-engineering work in [`mos9527/SonyHeadphonesClient`](https://github.com/mos9527/SonyHeadphonesClient) and [`Plutoberth/SonyHeadphonesClient`](https://github.com/Plutoberth/SonyHeadphonesClient) (both MIT) — see [`NOTICE`](./NOTICE) for attribution and [`PROTOCOL.md`](./PROTOCOL.md) for byte-level protocol documentation, and [`PLAN.md`](./PLAN.md) for what is planned next.
 
 ## Design
 
@@ -84,9 +84,10 @@ The reverse applies too: while Nullpoint is connected, the phone app won't be ab
 
 ## Known limitations
 
-- No signed builds. Windows SmartScreen warns on the installer; macOS has no downloadable build at all.
+- No code-signing identity. Windows SmartScreen warns on the installer, and the macOS build is ad-hoc signed rather than notarized.
 - "Auto ambient level" is visibly disabled — it needs a protocol variant that isn't implemented yet.
 - Only the single-battery reading is wired up, so earbuds won't show per-bud or case levels.
+- See [`PLAN.md`](./PLAN.md) for what's planned next, including the connected-device list and Adaptive Sound Control.
 - Tested against one model (WH-1000XM6). Other Sony models use the same protocol and should work, but are unverified — [reports welcome](https://github.com/mehrshaad/nullpoint/issues).
 
 ## License

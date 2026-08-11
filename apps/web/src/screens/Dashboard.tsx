@@ -96,7 +96,7 @@ export function Dashboard({
       )}
 
       <div
-        className="dashboard-measure"
+        className="measure"
         style={{ flex: "none", display: "flex", alignItems: "center", gap: 16, padding: "18px 20px 16px" }}
       >
         <div
@@ -194,7 +194,7 @@ export function Dashboard({
       </div>
 
       <div
-        className="dashboard-grid dashboard-measure"
+        className="dashboard-grid measure"
         style={{
           flex: 1,
           minHeight: 0,

@@ -308,7 +308,7 @@ export function Landing() {
           the protocol work comes from the community projects credited in the repository.
         </p>
         <div className="lp-cta-row">
-          <a className="lp-btn lp-btn-ghost" href={`${REPO}/blob/main/PLAN.md`} target="_blank" rel="noreferrer">
+          <a className="lp-btn lp-btn-ghost" href={`${REPO}/blob/main/PROTOCOL.md`} target="_blank" rel="noreferrer">
             Read the protocol notes
           </a>
         </div>

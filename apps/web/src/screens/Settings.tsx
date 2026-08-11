@@ -67,7 +67,11 @@ export function Settings({
         </button>
       </div>
 
-      <div style={{ flex: 1, overflow: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 18 }}>
+      <div style={{ flex: 1, overflow: "auto" }}>
+        <div
+          className="measure-narrow"
+          style={{ padding: "20px 24px 32px", display: "flex", flexDirection: "column", gap: 18 }}
+        >
         <div className="mono" style={{ fontWeight: 600, fontSize: 11, letterSpacing: "0.14em", color: "var(--fg3)" }}>
           GENERAL
         </div>
@@ -171,6 +175,7 @@ export function Settings({
             </a>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

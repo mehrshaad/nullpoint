@@ -35,6 +35,11 @@ export type HeadphonesEvent =
 
 const ACK_TIMEOUT_MS = 2000;
 const MAX_SEND_ATTEMPTS = 3; // PLAN.md §4.3: retry-on-timeout
+/**
+ * The headset pushes POWER_NTFY_STATUS when the charge level changes, but appears to do so
+ * only on coarse steps. A slow poll keeps the reading honest without meaningful traffic.
+ */
+const BATTERY_REFRESH_MS = 60_000;
 
 /**
  * A single connected headset. Owns the frame reassembler and the send/ACK/retry loop;
@@ -67,7 +72,10 @@ export class Headphones {
         }
       }
     });
-    transport.onDisconnect(() => this.emit({ type: "disconnected" }));
+    transport.onDisconnect(() => {
+      this.stopBatteryRefresh();
+      this.emit({ type: "disconnected" });
+    });
   }
 
   on(cb: (event: HeadphonesEvent) => void): () => void {
@@ -118,7 +126,33 @@ export class Headphones {
     await this.request(DataType.DATA_MDR, NcAsm.encodeGetNcAsm(), CommandT1.NCASM_RET_PARAM);
     await this.request(DataType.DATA_MDR, Eq.encodeGetEq(), CommandT1.EQEBB_RET_PARAM);
 
+    this.startBatteryRefresh();
     return this.state;
+  }
+
+  private batteryTimer: ReturnType<typeof setInterval> | null = null;
+
+  private startBatteryRefresh(): void {
+    this.stopBatteryRefresh();
+    this.batteryTimer = setInterval(() => {
+      // Fire and forget: the reply is picked up by handleFrame like any other status frame,
+      // and a failure here is not worth surfacing — the next tick will try again.
+      void this.send(
+        DataType.DATA_MDR,
+        Battery.encodeGetBattery(PowerInquiredType.BATTERY)
+      ).catch(() => {});
+    }, BATTERY_REFRESH_MS);
+  }
+
+  private stopBatteryRefresh(): void {
+    if (this.batteryTimer) clearInterval(this.batteryTimer);
+    this.batteryTimer = null;
+  }
+
+  /** Stop background work and close the link. */
+  async disconnect(): Promise<void> {
+    this.stopBatteryRefresh();
+    await this.transport.close();
   }
 
   async setNoiseMode(mode: NcAsm.NoiseMode): Promise<void> {
@@ -265,7 +299,8 @@ export class Headphones {
     for (const cb of this.rawResponseListeners.get(command) ?? []) cb(frame.payload);
 
     switch (command) {
-      case CommandT1.POWER_RET_STATUS: {
+      case CommandT1.POWER_RET_STATUS:
+      case CommandT1.POWER_NTFY_STATUS: {
         if (frame.payload[1] === PowerInquiredType.BATTERY) {
           const battery = Battery.decodeRetBattery(frame.payload);
           this.state.battery = battery;

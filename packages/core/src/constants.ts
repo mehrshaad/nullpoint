@@ -64,6 +64,8 @@ export enum CommandT1 {
 
   POWER_GET_STATUS = 0x22,
   POWER_RET_STATUS = 0x23,
+  /** Pushed by the headset when the charge level changes, without being asked. */
+  POWER_NTFY_STATUS = 0x25,
 
   EQEBB_GET_PARAM = 0x56,
   EQEBB_RET_PARAM = 0x57,

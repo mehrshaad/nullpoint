@@ -11,13 +11,13 @@ export function Connecting({ onCancel }: { onCancel: () => void }) {
     <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "var(--bg)" }}>
       <TitleBar statusColor="var(--accent)" />
       <div
+        className="pad-x"
         style={{
           flex: 1,
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          padding: "0 80px",
         }}
       >
         <div style={{ position: "relative", width: 96, height: 96 }}>
