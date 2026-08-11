@@ -153,7 +153,7 @@ export function Settings({
               NULLPOINT
             </div>
             <div className="mono" style={{ fontSize: 11, color: "var(--fg3)" }}>
-              0.2.1 · Apache-2.0
+              0.2.2 · Apache-2.0
             </div>
           </div>
           <div style={{ marginTop: 12, fontSize: 12, lineHeight: 1.65, color: "var(--fg2)", maxWidth: 520 }}>
