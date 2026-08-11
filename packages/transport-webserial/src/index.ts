@@ -60,6 +60,12 @@ export class WebSerialTransport implements Transport {
   async open(): Promise<void> {
     if (!this.port) throw new Error("WebSerialTransport: no port");
     this.disconnectFired = false;
+
+    // A dropped link does not close the port, and reopening an open port throws
+    // InvalidStateError — which would make every reconnect attempt fail before it ever reached
+    // the headphones. Release whatever the previous session left behind first.
+    await this.releasePort();
+
     // baudRate is required by the Web Serial API but meaningless for an RFCOMM virtual channel —
     // the OS Bluetooth stack ignores it. Chrome for Developers, "Serial over Bluetooth".
     await this.port.open({ baudRate: 115200 });
@@ -68,12 +74,33 @@ export class WebSerialTransport implements Transport {
     void this.readLoop();
   }
 
-  async close(): Promise<void> {
+  /** Tears down reader, writer and the port itself, tolerating anything already closed. */
+  private async releasePort(): Promise<void> {
     this.readLoopAbort = true;
+    try {
+      await this.reader?.cancel();
+    } catch {
+      // already cancelled
+    }
+    this.reader = null;
+    try {
+      this.writer?.releaseLock();
+    } catch {
+      // already released
+    }
+    this.writer = null;
+    if (this.port?.readable || this.port?.writable) {
+      try {
+        await this.port.close();
+      } catch {
+        // already closed, or never opened
+      }
+    }
+  }
+
+  async close(): Promise<void> {
     navigator.serial.removeEventListener("disconnect", this.onGlobalDisconnect);
-    await this.reader?.cancel().catch(() => {});
-    await this.writer?.close().catch(() => {});
-    await this.port?.close().catch(() => {});
+    await this.releasePort();
   }
 
   async write(bytes: Uint8Array): Promise<void> {

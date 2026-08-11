@@ -45,6 +45,7 @@ export function App() {
           headphones={headphones}
           onSettingsClick={() => setShowSettings(true)}
           reconnecting={connection.status === "reconnecting"}
+          reconnectReason={connection.status === "reconnecting" ? connection.reason : undefined}
           controlLost={controlLost}
           onCancelReconnect={reset}
         />

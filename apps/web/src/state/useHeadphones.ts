@@ -50,12 +50,21 @@ export type ConnectionStatus =
   | { status: "unsupported" }
   | { status: "idle" }
   | { status: "connecting" }
-  | { status: "reconnecting" }
+  | { status: "reconnecting"; reason: "busy" | "gone" }
   | { status: "failed"; message: string }
   | { status: "connected" };
 
-const MAX_RECONNECT_ATTEMPTS = 5;
-const RECONNECT_DELAY_MS = 1500;
+// Reconnection keeps going for as long as the user lets it. Giving up after a handful of
+// tries stranded people on a dead end that only a page refresh cleared, when the usual cause
+// — a phone holding the control channel — resolves on its own minutes later.
+const RECONNECT_BASE_MS = 1500;
+const RECONNECT_MAX_MS = 15_000;
+
+/** The headset is reachable but its control channel is taken (see PROTOCOL.md, 0x2740). */
+function isChannelBusy(err: unknown): boolean {
+  const text = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+  return /failed to open|already open|access denied|NetworkError/i.test(text);
+}
 
 /**
  * Owns the connect lifecycle: pick a port (user gesture), open the Web Serial transport, run the
@@ -104,9 +113,12 @@ export function useHeadphones({ autoReconnect = true }: { autoReconnect?: boolea
   const attemptReconnect = useCallback(
     async (port: SerialPort) => {
       cancelledRef.current = false;
-      setConnection({ status: "reconnecting" });
-      for (let attempt = 0; attempt < MAX_RECONNECT_ATTEMPTS; attempt++) {
-        await new Promise((resolve) => setTimeout(resolve, RECONNECT_DELAY_MS));
+      let reason: "busy" | "gone" = "gone";
+      let delay = RECONNECT_BASE_MS;
+      setConnection({ status: "reconnecting", reason });
+
+      while (!cancelledRef.current) {
+        await new Promise((resolve) => setTimeout(resolve, delay));
         if (cancelledRef.current) return; // user hit Cancel — abandon the retry loop
         try {
           const state = await establish(port);
@@ -114,12 +126,12 @@ export function useHeadphones({ autoReconnect = true }: { autoReconnect?: boolea
           setDeviceState(state);
           setConnection({ status: "connected" });
           return;
-        } catch {
-          // keep retrying — the headset is likely still powering back on
+        } catch (err) {
+          // Back off so a long wait costs almost nothing, and say which kind of wait it is.
+          reason = isChannelBusy(err) ? "busy" : "gone";
+          setConnection({ status: "reconnecting", reason });
+          delay = Math.min(Math.round(delay * 1.6), RECONNECT_MAX_MS);
         }
-      }
-      if (!cancelledRef.current) {
-        setConnection({ status: "failed", message: "Lost the connection and couldn't reconnect automatically." });
       }
     },
     [establish]

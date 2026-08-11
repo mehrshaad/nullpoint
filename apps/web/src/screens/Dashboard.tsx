@@ -15,6 +15,7 @@ export function Dashboard({
   headphones,
   onSettingsClick,
   reconnecting,
+  reconnectReason = "gone",
   controlLost = false,
   onCancelReconnect,
 }: {
@@ -22,6 +23,8 @@ export function Dashboard({
   headphones: Headphones;
   onSettingsClick: () => void;
   reconnecting: boolean;
+  /** Why we are reconnecting: the channel is taken, or the headset is simply not there. */
+  reconnectReason?: "busy" | "gone";
   /** Link is up, but another device holds the control channel — see useHeadphones. */
   controlLost?: boolean;
   onCancelReconnect: () => void;
@@ -74,8 +77,10 @@ export function Dashboard({
               animation: "np-pulse 1.4s ease-in-out infinite",
             }}
           />
-          <div style={{ fontWeight: 500, fontSize: 12, lineHeight: 1.3, color: "var(--warn)" }}>
-            Link lost — reconnecting to {state.modelName ?? "your headphones"}…
+          <div style={{ fontWeight: 500, fontSize: 12, lineHeight: 1.35, color: "var(--warn)" }}>
+            {reconnectReason === "busy"
+              ? "Another device has the control channel — waiting for it to let go. This reconnects on its own; no need to retry."
+              : `Link lost — reconnecting to ${state.modelName ?? "your headphones"}…`}
           </div>
           <div style={{ flex: 1 }} />
           <button
