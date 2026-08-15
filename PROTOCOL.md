@@ -118,6 +118,8 @@ Each is asked for only if `CONNECT_RET_SUPPORT_FUNCTION` lists its function type
 | Connection quality | 0xE1 | `AUDIO_*_PARAM (0xE6/E7/E8/E9)`, inquired type `CONNECTION_MODE 0x00`, value `PriorMode` (`SOUND_QUALITY 0`, `CONNECTION_QUALITY 1`, `LOW_LATENCY_BETA 2`) |
 | DSEE Extreme | 0xE2 | the same family, inquired type `UPSCALING 0x01`, value `OFF 0` / `AUTO 1` |
 | Speak-to-Chat | 0xFC | **two** messages, see below |
+| Pause on removal | 0xF1 | `SYSTEM_*_PARAM`, inquired type `PLAYBACK_CONTROL_BY_WEARING 0x01`, value `EnableDisable` |
+| Power off | 0x23 | `POWER_SET_STATUS (0x24)` + `POWER_OFF (0x03)` + `USER_POWER_OFF (0x01)`. No value to read back |
 
 All the AUDIO param messages share one shape: `[command][inquiredType][value]`.
 

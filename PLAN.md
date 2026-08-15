@@ -90,6 +90,8 @@ control the hardware doesn't have rather than showing it disabled.
 | ✅ **Speak-to-Chat** | On/off, voice sensitivity, and how long before your music resumes |
 | ✅ **DSEE Extreme** | Upscaling auto/off |
 | ✅ **Connection quality** | Sound quality vs. stable link vs. low latency — a real daily tradeoff |
+| ✅ **Pause on removal** | Wear detection driving playback |
+| ✅ **Power off** | A button in Settings, beside the capability report |
 
 **Remaining**, highest value first:
 
@@ -98,11 +100,13 @@ control the hardware doesn't have rather than showing it disabled.
 | **Adaptive Sound Control** | Auto-switches ANC/ambient by activity (still, walking, transport). Arguably the XM6's headline feature and entirely missing today |
 | **Touch sensor** | Enable/disable, and remap what each side does |
 | **Voice guidance** | On/off and volume |
-| **Pause on removal** | Wear-detection behaviour |
 | **Auto power off** | Idle timeout, with or without wear detection |
-| **Power off** | One command |
 | **Listening mode** | Background-music mode and its distance setting |
 | **Safe listening** | Exposure reporting |
+
+The capability report in Settings lists every function type the headset advertised, including
+the ones Nullpoint ignores. That list is where the next features should come from — it says what
+this hardware can actually do, rather than what the protocol dump says some hardware can.
 
 ---
 
@@ -135,6 +139,32 @@ Drive the whole UI from the capability bitmap rather than assuming a WH-1000XM6:
 - **Linux** AppImage — the config is already there but untested.
 
 ---
+
+## Next hardware session
+
+Everything below is built, tested against the fake device, and has never met a real headset.
+Working through this in one sitting settles all of it. **Open Settings first** — the capability
+report answers most of these questions before you touch a control.
+
+1. **What did the headset report?** Settings → "What your headphones report". Whether the
+   WH-1000XM6 lists noise adaptation (0x6D) rather than plain noise control (0x6B) decides
+   whether auto ambient level can exist at all. Note the "reported but not used" codes.
+2. **Did a device list appear?** The CONNECTED TO panel only exists if Table 2 answered. If it
+   is missing, that is the finding — the panel is behaving correctly.
+3. **Connect and disconnect a device from that panel.** Disconnecting the phone should show it
+   as PAIRED within a moment. Disconnecting *this computer* drops the link on purpose; the
+   reconnect loop should pick it back up.
+4. **Auto ambient level, and its LOW/STANDARD/HIGH.** Then change the noise mode and check auto
+   ambient did not switch itself off — every NC/ASM write sends the whole message.
+5. **Speak-to-Chat the right way round.** `ENABLE` is 0 on the wire, so an inverted result here
+   is the specific bug to watch for: turning it on in the app should turn it on in reality, not
+   off.
+6. **Connection quality, DSEE, pause-on-removal, power off.**
+7. **The old flicker.** Change a mode repeatedly and while the phone is playing. Commands are
+   serialised now; the change-then-revert-then-settle behaviour should be gone.
+
+Anything that misbehaves is worth capturing with the capability report alongside it — that is
+the context that makes a protocol bug diagnosable.
 
 ## Standing engineering rules
 
