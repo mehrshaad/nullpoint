@@ -29,14 +29,15 @@ const INQUIRED_TYPE: Record<NcAsmVariant, NcAsmInquiredType> = {
 
 /**
  * Picks the message shape from the capability bitmap, never from the model name (PLAN.md
- * standing rule 4). The order matches upstream exactly (Headphones.cpp:184-195): a headset
- * advertising the plain level-adjustment function uses the plain form even if it also
- * advertises noise adaptation.
+ * standing rule 4).
+ *
+ * **Noise adaptation wins when both are advertised.** Upstream checks them the other way round
+ * (Headphones.cpp:184-195), and a WH-1000XM6 on FW 3.1.5 reports *both* 0x6B and 0x6D — so
+ * preferring the plain form means writing a 7-byte message with no auto-ambient fields in it,
+ * and the auto ambient control silently does nothing. Verified against the hardware: the
+ * headset answers in the 9-byte noise-adaptation shape, so that is what it wants to be told.
  */
 export function ncAsmVariantFor(supportedFunctions: Set<number>): NcAsmVariant {
-  if (supportedFunctions.has(FunctionTypeT1.MODE_NC_ASM_NOISE_CANCELLING_DUAL_AMBIENT_SOUND_MODE_LEVEL_ADJUSTMENT)) {
-    return "seamless";
-  }
   if (
     supportedFunctions.has(
       FunctionTypeT1.MODE_NC_ASM_NOISE_CANCELLING_DUAL_AMBIENT_SOUND_MODE_LEVEL_ADJUSTMENT_NOISE_ADAPTATION

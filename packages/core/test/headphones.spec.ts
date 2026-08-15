@@ -171,8 +171,9 @@ function createFakeDevice({
       case CommandT1.CONNECT_GET_SUPPORT_FUNCTION: {
         const functions = [
           FunctionTypeT1.BATTERY_LEVEL_INDICATOR,
-          // 0x6b is the plain level-adjustment function, 0x6d the noise-adaptation one.
-          noiseAdaptation ? 0x6d : 0x6b,
+          // A real WH-1000XM6 on FW 3.1.5 advertises *both* the plain level-adjustment
+          // function (0x6B) and the noise-adaptation one (0x6D), so the fake does too.
+          ...(noiseAdaptation ? [0x6b, 0x6d] : [0x6b]),
           ...(extras
             ? [
                 FunctionTypeT1.CONNECTION_MODE_SOUND_QUALITY_CONNECTION_QUALITY,
@@ -496,6 +497,28 @@ describe("Headphones.connect() over a fake device", () => {
     transport.simulateDisconnect();
     expect(events).toEqual(["disconnected"]);
   });
+
+  it("relinks instead of waiting forever when the headset stops accepting commands", async () => {
+    // The multipoint case: the link stays open and notifications keep arriving, but commands
+    // go unanswered. Polling never wins the control channel back — reopening the port does —
+    // so the session must give up and drop the link rather than sit there disabled.
+    let deaf = false;
+    const device = createFakeDevice();
+    const transport = new LoopbackTransport((sent) => (deaf ? [] : device(sent)));
+    const hp = new Headphones(transport);
+    await hp.connect();
+
+    const events: string[] = [];
+    hp.on((e) => events.push(e.type));
+
+    deaf = true;
+    await hp.setNoiseMode("ambient"); // fails, flips to control-lost and starts fast probing
+    expect(hp.controllable).toBe(false);
+
+    // Two unanswered probes at 4s apart, each taking the full retry budget before failing.
+    await new Promise((resolve) => setTimeout(resolve, 26_000));
+    expect(events).toContain("disconnected");
+  }, 60_000);
 
   it("uses the noise-adaptation message shape when the headset advertises it", async () => {
     const transport = new LoopbackTransport(createFakeDevice({ noiseAdaptation: true }));

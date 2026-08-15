@@ -92,6 +92,8 @@ const BATTERY_REFRESH_MS = 60_000;
 const CONTROL_PROBE_MS = 4_000;
 /** How long to wait for the headset to announce that a change has taken effect. */
 const CONFIRM_TIMEOUT_MS = 2_500;
+/** Unanswered probes tolerated before we relink rather than keep waiting. */
+const RECLAIM_AFTER_FAILED_PROBES = 2;
 
 /**
  * A single connected headset. Owns the frame reassembler and the send/ACK/retry loop;
@@ -394,6 +396,7 @@ export class Headphones {
   private hasControl = true;
   private supportsTable2 = false;
   private ncAsmVariant: NcAsm.NcAsmVariant = "seamless";
+  private controlProbeFailures = 0;
 
   /** True while the headset is still accepting our commands. */
   get controllable(): boolean {
@@ -413,7 +416,7 @@ export class Headphones {
     this.batteryTimer = setInterval(() => {
       void this.send(DataType.DATA_MDR, Battery.encodeGetBattery(PowerInquiredType.BATTERY))
         .then(() => this.noteResponsive())
-        .catch(() => this.noteControlLost());
+        .catch(() => this.noteProbeFailed());
     }, intervalMs);
   }
 
@@ -527,10 +530,30 @@ export class Headphones {
 
   /** The headset answered us, so we still have the control channel. */
   private noteResponsive(): void {
+    this.controlProbeFailures = 0;
     if (this.hasControl) return;
     this.hasControl = true;
     this.setBatteryInterval(BATTERY_REFRESH_MS);
     this.emit({ type: "controlRegained" });
+  }
+
+  /**
+   * A probe went unanswered. Waiting is only worth so much: the headset keeps broadcasting
+   * notifications while refusing our commands, so the link looks alive and the app sits there
+   * showing values it can no longer change. Polling never wins the control channel back —
+   * reopening the port is what does (PROTOCOL.md, "the channel is reclaimable") — so after a
+   * few unanswered probes, drop the link and let the reconnect loop take it back.
+   */
+  private noteProbeFailed(): void {
+    this.noteControlLost();
+    this.controlProbeFailures += 1;
+    if (this.controlProbeFailures < RECLAIM_AFTER_FAILED_PROBES) return;
+    this.controlProbeFailures = 0;
+    this.stopBatteryRefresh();
+    void this.transport
+      .close()
+      .catch(() => undefined)
+      .then(() => this.emit({ type: "disconnected" }));
   }
 
   /**
@@ -739,6 +762,10 @@ export class Headphones {
       case CommandT1.NCASM_RET_PARAM:
       case CommandT1.NCASM_NTFY_PARAM: {
         const ncAsm = NcAsm.decodeNcAsm(frame.payload);
+        // The shape the headset replies in is the authority on the shape it wants to be told,
+        // whatever its capability bitmap implied. Getting this wrong writes a message with no
+        // auto-ambient fields, so the control appears to work and changes nothing.
+        this.ncAsmVariant = ncAsm.autoAmbient ? "seamlessNa" : "seamless";
         // A setting still in motion reports the value it is leaving behind. Adopting that
         // would visibly bounce the UI back to the old mode, so wait for the settled frame.
         if (!ncAsm.settled) break;

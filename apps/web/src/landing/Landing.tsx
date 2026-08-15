@@ -14,6 +14,63 @@ import "./landing.css";
 const REPO = "https://github.com/mehrshaad/nullpoint";
 const LATEST_RELEASE = `${REPO}/releases/latest`;
 
+type Platform = "windows" | "macos" | "linux" | "mobile" | "unknown";
+
+/**
+ * Which download to put in front of the visitor. `userAgentData` is the modern, non-frozen
+ * source and is checked first; the user-agent string is the fallback for Safari and Firefox.
+ *
+ * iPadOS deliberately claims to be a Macintosh, so a "Mac" that reports touch points is treated
+ * as mobile — otherwise iPad visitors are offered a .dmg they cannot use.
+ */
+function detectPlatform(): Platform {
+  const nav = navigator as Navigator & {
+    userAgentData?: { platform?: string; mobile?: boolean };
+  };
+  if (nav.userAgentData?.mobile) return "mobile";
+
+  const ua = `${nav.userAgentData?.platform ?? ""} ${navigator.userAgent}`.toLowerCase();
+  if (/android|iphone|ipod/.test(ua)) return "mobile";
+  if (/mac os x|macintosh|macos/.test(ua)) {
+    return navigator.maxTouchPoints > 1 ? "mobile" : "macos";
+  }
+  if (/windows|win32|win64/.test(ua)) return "windows";
+  if (/linux|x11|cros/.test(ua)) return "linux";
+  return "unknown";
+}
+
+/**
+ * Linux has no build yet (the packaging config exists but is untested), so those visitors are
+ * sent to the releases page rather than promised a binary that isn't there.
+ */
+const DOWNLOAD_CTA: Record<Platform, { label: string; note: string; browserButton: boolean }> = {
+  windows: {
+    label: "Download for Windows",
+    note: "FREE AND OPEN SOURCE · NO ACCOUNT · PAIR THE HEADPHONES FIRST",
+    browserButton: true,
+  },
+  macos: {
+    label: "Download for macOS",
+    note: "APPLE SILICON AND INTEL · FREE AND OPEN SOURCE · PAIR THE HEADPHONES FIRST",
+    browserButton: true,
+  },
+  linux: {
+    label: "See the downloads",
+    note: "NO LINUX BUILD YET · THE WEB APP WORKS ON CHROME AND EDGE",
+    browserButton: true,
+  },
+  mobile: {
+    label: "See desktop downloads",
+    note: "NULLPOINT NEEDS A COMPUTER · SONY'S OWN APP ALREADY COVERS PHONES",
+    browserButton: false,
+  },
+  unknown: {
+    label: "Download the app",
+    note: "WINDOWS AND MACOS · FREE AND OPEN SOURCE · PAIR THE HEADPHONES FIRST",
+    browserButton: true,
+  },
+};
+
 const MODES: Array<{ id: NoiseMode; label: string; sub: string; tone: string }> = [
   { id: "anc", label: "Noise Canceling", sub: "ANC", tone: "accent" },
   { id: "ambient", label: "Ambient Sound", sub: "AMB", tone: "amber" },
@@ -190,6 +247,12 @@ const FEATURES = [
 ];
 
 export function Landing() {
+  // Resolved once on mount rather than at module load, so a prerendered or cached document
+  // never ships one visitor's platform to the next.
+  const [platform, setPlatform] = useState<Platform>("unknown");
+  useEffect(() => setPlatform(detectPlatform()), []);
+  const cta = DOWNLOAD_CTA[platform];
+
   return (
     <div className="lp">
       <nav className="lp-nav">
@@ -233,14 +296,16 @@ export function Landing() {
 
         <div className="lp-cta-row lp-rise" style={{ animationDelay: "0.14s" }}>
           <a className="lp-btn lp-btn-primary" href={LATEST_RELEASE}>
-            Download for Windows
+            {cta.label}
           </a>
-          <a className="lp-btn lp-btn-ghost" href="/app">
-            Open in your browser
-          </a>
+          {cta.browserButton && (
+            <a className="lp-btn lp-btn-ghost" href="/app">
+              Open in your browser
+            </a>
+          )}
         </div>
         <div className="lp-cta-note lp-rise" style={{ animationDelay: "0.18s" }}>
-          FREE AND OPEN SOURCE · NO ACCOUNT · PAIR THE HEADPHONES FIRST
+          {cta.note}
         </div>
 
         <WireInspector />
@@ -268,7 +333,9 @@ export function Landing() {
           <span className="lp-section-note">THE HEADPHONES MUST ALREADY BE PAIRED</span>
         </div>
         <div className="lp-dl">
-          <a className="lp-dl-card" data-primary="true" href={LATEST_RELEASE}>
+          {/* The visitor's own platform is the highlighted card, so the right one is obvious
+              without reading all three. */}
+          <a className="lp-dl-card" data-primary={platform === "windows"} href={LATEST_RELEASE}>
             <div className="lp-dl-os">Windows</div>
             <div className="lp-dl-meta">INSTALLER · 64-BIT</div>
             <p className="lp-dl-body">
@@ -278,17 +345,21 @@ export function Landing() {
             <div className="lp-dl-action">Download the installer →</div>
           </a>
 
-          <a className="lp-dl-card" href={`${REPO}#getting-started`}>
+          <a className="lp-dl-card" data-primary={platform === "macos"} href={LATEST_RELEASE}>
             <div className="lp-dl-os">macOS</div>
-            <div className="lp-dl-meta">BUILD FROM SOURCE</div>
+            <div className="lp-dl-meta">APPLE SILICON · INTEL</div>
             <p className="lp-dl-body">
-              The app runs on macOS and lives in the menu bar, but there is no signed build to
-              download yet — you will need to build it yourself.
+              The same app, living in the menu bar. Ad-hoc signed rather than notarized, so
+              right-click → Open the first time you run it.
             </p>
-            <div className="lp-dl-action">See the build steps →</div>
+            <div className="lp-dl-action">Download the disk image →</div>
           </a>
 
-          <a className="lp-dl-card" href="/app">
+          <a
+            className="lp-dl-card"
+            data-primary={platform === "linux" || platform === "unknown"}
+            href="/app"
+          >
             <div className="lp-dl-os">Browser</div>
             <div className="lp-dl-meta">CHROME · EDGE · OPERA · ARC</div>
             <p className="lp-dl-body">
