@@ -10,36 +10,28 @@ shippable — none of them blocks the others except where stated.
 
 ---
 
-## Phase 0 — Make multipoint work (highest priority)
+## Phase 0 — Multipoint ✅ done
 
-The one thing that stops Nullpoint being usable day-to-day: **the headset hands out its control
-channel to one host at a time**, so with a phone also connected, connecting fails with `0x2740`
-(see PROTOCOL.md). Audio multipoint is unaffected — this is only the settings channel.
+**Changing settings from the computer while the phone plays music works.** Confirmed on a
+WH-1000XM6, and separately on a WH-CH720N.
 
-What is *not* yet known is whether this is a hard device limit or a first-come-first-served
-claim. That distinction decides everything below, so establish it first.
+The open question — hard firmware limit, or first-come-first-served — turned out to be neither
+exactly. The headset does hand out its control channel to one device at a time, but the channel
+is **reclaimable**: retrying wins it back while the other device keeps playing audio. The
+earlier conclusion that this was impossible was wrong, and the reason is worth remembering: the
+retries were failing for an unrelated bug. The local serial port was never closed before being
+reopened, so every attempt died at `open()` before it ever reached the headset. The device was
+never given a fair chance to answer.
 
-**Experiment (needs a second device, so it cannot be automated here):**
+Shipped as a result:
 
-1. Disconnect the phone. Connect Nullpoint. Confirm it works.
-2. **With Nullpoint still connected**, reconnect the phone and let it take audio.
-3. Change ANC from Nullpoint.
-
-- If step 3 works → the channel is claimed first-come. Ship "connect Nullpoint first" as the
-  documented behaviour, hold the session open deliberately, and reconnect automatically the
-  moment the channel frees up.
-- If step 3 fails → it is a firmware limit. Then the honest answer is UX, not engineering:
-  detect the condition precisely, name which device is holding it (Phase 1 gives us the
-  names), and offer a one-click "take control" that retries in a loop until the phone
-  releases it.
-
-Either way, add: retry-with-backoff on `0x2740` rather than failing immediately, and a clear
-banner while another device holds the link.
-
-**Done when:** the two-device behaviour is understood, documented, and the app either works in
-that state or explains it accurately and recovers by itself.
-
----
+- Reconnection retries for as long as the user allows, backing off to 15s, instead of giving up
+  after five attempts and dead-ending on a screen only a refresh could clear.
+- The banner distinguishes waiting for a busy channel from a headset that is simply gone.
+- Losing control mid-session is detected, surfaced honestly, and recovered from on its own; the
+  UI reverts rather than showing a setting the headphones never accepted.
+- All commands are serialised, since the link carries one request/response at a time and
+  overlapping commands were orphaning each other's acknowledgement.
 
 ## Phase 1 — Connected devices (Table 2)
 

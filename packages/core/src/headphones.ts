@@ -199,13 +199,15 @@ export class Headphones {
     this.state.ncAsm = next;
     this.emit({ type: "ncAsm", state: next, origin: "local" });
     try {
-      // Listen before sending: the headset announces the change itself, and waiting for that
-      // announcement is what confirms it landed. Polling with a GET instead races the change —
-      // the headset applies it asynchronously and answers with the value still on its way out,
-      // which is what made a freshly picked mode snap back to the previous one.
-      const settled = this.waitForSettledNcAsm(CONFIRM_TIMEOUT_MS);
-      await this.send(DataType.DATA_MDR, NcAsm.encodeSetNcAsm(next));
-      await settled;
+      // Arm the listener and write as one queued unit. The headset announces the change
+      // itself and that announcement is what confirms it landed, so we must be listening
+      // before the write goes out — but starting the clock before the queue reaches us would
+      // burn the timeout waiting behind another command.
+      await this.enqueue(async () => {
+        const settled = this.waitForSettledNcAsm(CONFIRM_TIMEOUT_MS);
+        await this.sendNow(DataType.DATA_MDR, NcAsm.encodeSetNcAsm(next));
+        await settled;
+      });
       this.noteResponsive();
     } catch {
       // No announcement. Ask outright before concluding anything: some changes are quiet.
@@ -321,6 +323,31 @@ export class Headphones {
    * drifts out of step with the headset and it stops replying.
    */
   private async send(dataType: DataType, data: Uint8Array): Promise<void> {
+    return this.enqueue(() => this.sendNow(dataType, data));
+  }
+
+  /**
+   * Serialises every exchange with the headset.
+   *
+   * The link carries one request/response at a time and there is a single slot for the pending
+   * acknowledgement, so two overlapping commands — a user changing a mode while the background
+   * battery refresh is in flight, or two quick clicks — orphan each other's ACK. The orphaned
+   * one then times out, is treated as a failure, and the UI briefly snaps back before the
+   * device's own notification corrects it. Queueing removes the collision entirely.
+   */
+  private queue: Promise<unknown> = Promise.resolve();
+
+  private enqueue<T>(task: () => Promise<T>): Promise<T> {
+    const run = this.queue.then(task, task);
+    // Keep the chain alive regardless of how the previous task ended.
+    this.queue = run.then(
+      () => undefined,
+      () => undefined
+    );
+    return run;
+  }
+
+  private async sendNow(dataType: DataType, data: Uint8Array): Promise<void> {
     for (let attempt = 0; attempt < MAX_SEND_ATTEMPTS; attempt++) {
       const frame = packageDataForBt(dataType, this.seq, data);
       const ackPromise = new Promise<void>((resolve) => {
@@ -353,20 +380,24 @@ export class Headphones {
   }
 
   /** Send a command and wait for its typed RET response (not just the ACK). */
-  private async request(dataType: DataType, data: Uint8Array, expectCommand: CommandT1): Promise<Uint8Array> {
-    const responsePromise = new Promise<Uint8Array>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        unsubscribe();
-        reject(new Error(`Timed out waiting for response 0x${expectCommand.toString(16)}`));
-      }, ACK_TIMEOUT_MS);
-      const unsubscribe = this.onRawResponse(expectCommand, (payload) => {
-        clearTimeout(timer);
-        unsubscribe();
-        resolve(payload);
+  private request(dataType: DataType, data: Uint8Array, expectCommand: CommandT1): Promise<Uint8Array> {
+    // Queued as one unit: the listener must be armed before the write, and no other command
+    // may interleave between the two.
+    return this.enqueue(async () => {
+      const responsePromise = new Promise<Uint8Array>((resolve, reject) => {
+        const timer = setTimeout(() => {
+          unsubscribe();
+          reject(new Error(`Timed out waiting for response 0x${expectCommand.toString(16)}`));
+        }, ACK_TIMEOUT_MS);
+        const unsubscribe = this.onRawResponse(expectCommand, (payload) => {
+          clearTimeout(timer);
+          unsubscribe();
+          resolve(payload);
+        });
       });
+      await this.sendNow(dataType, data);
+      return responsePromise;
     });
-    await this.send(dataType, data);
-    return responsePromise;
   }
 
   private rawResponseListeners = new Map<number, Set<(payload: Uint8Array) => void>>();

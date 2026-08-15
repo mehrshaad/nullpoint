@@ -295,6 +295,20 @@ describe("Headphones.connect() over a fake device", () => {
     expect(hp.state.ncAsm?.mode).toBe(NcAsmMode.ASM);
   });
 
+  it("serialises overlapping commands so neither loses its acknowledgement", async () => {
+    // Two commands in flight at once used to collide on the single pending-ack slot: one was
+    // orphaned, timed out, and briefly reverted the UI before the device corrected it. Issued
+    // together, both must now succeed and the final state must be the later of the two.
+    const transport = new LoopbackTransport(createFakeDevice());
+    const hp = new Headphones(transport);
+    await hp.connect();
+
+    await Promise.all([hp.setNoiseMode("ambient"), hp.setAmbientLevel(9)]);
+
+    expect(hp.controllable).toBe(true);
+    expect(hp.state.ncAsm?.ambientLevel).toBe(9);
+  }, 20_000);
+
   it("emits 'disconnected' when the transport link drops", async () => {
     const transport = new LoopbackTransport(createFakeDevice());
     const hp = new Headphones(transport);

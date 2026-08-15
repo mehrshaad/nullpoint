@@ -10,7 +10,7 @@
 
 Sony's official "Sound Connect" app (Android/iOS only) talks to the headphones over a proprietary Bluetooth Classic RFCOMM channel to control ANC, ambient sound, EQ, and battery — audio itself is plain A2DP handled by the OS. Nullpoint reimplements that control channel for desktop and the web, using [Web Serial](https://developer.chrome.com/docs/capabilities/serial) to reach Bluetooth Classic RFCOMM (Web Bluetooth is BLE-only and can't do this).
 
-**Features:** device detection, live battery, noise-canceling / ambient-sound mode with a continuous ambient level slider and focus-on-voice, and the equalizer with Sony's presets. Both equalizer layouts are supported — Clear Bass plus 5 bands, and the 10-band graphic EQ newer firmware reports. Mode and EQ changes made on the headphones themselves appear in the app live. The desktop app lives in the tray, can start at login without opening a window, and reconnects on its own. Verified against a WH-1000XM6 on firmware 3.1.5.
+**Features:** device detection, live battery, noise-canceling / ambient-sound mode with a continuous ambient level slider and focus-on-voice, and the equalizer with Sony's presets. Both equalizer layouts are supported — Clear Bass plus 5 bands, and the 10-band graphic EQ newer firmware reports. Mode and EQ changes made on the headphones themselves appear in the app live. The desktop app lives in the tray, can start at login without opening a window, and reconnects on its own. Confirmed on a WH-1000XM6 (firmware 3.1.5) and a WH-CH720N.
 
 ## Screenshots
 
@@ -78,9 +78,9 @@ The UI implements the Nullpoint design system checked into [`design/`](./design)
 
 ## Multipoint
 
-The WH-1000X series plays audio from two devices at once, but it hands out its **settings channel to one device at a time**. So if your phone currently holds that channel, Nullpoint will find the headphones and then fail to open the link (`0x2740`, "only one usage of each socket address"). Disconnect the headphones from the other device and try again — Sony's app doesn't need to be open for the phone to be holding it.
+**Changing settings from your computer while your phone plays music works.** Audio multipoint and the settings channel are independent.
 
-The reverse applies too: while Nullpoint is connected, the phone app won't be able to change settings. Audio to both devices is unaffected either way.
+The one constraint is that the headphones hand out that settings channel to **one device at a time**. If another device is holding it, opening fails with `0x2740` ("only one usage of each socket address") — but the channel is reclaimable, and Nullpoint keeps retrying with backoff until it gets it, so this resolves without you doing anything. While Nullpoint holds it, the phone app won't be able to change settings, and vice versa. Audio to both devices is unaffected either way.
 
 ## Known limitations
 
@@ -88,7 +88,7 @@ The reverse applies too: while Nullpoint is connected, the phone app won't be ab
 - "Auto ambient level" is visibly disabled — it needs a protocol variant that isn't implemented yet.
 - Only the single-battery reading is wired up, so earbuds won't show per-bud or case levels.
 - See [`PLAN.md`](./PLAN.md) for what's planned next, including the connected-device list and Adaptive Sound Control.
-- Tested against one model (WH-1000XM6). Other Sony models use the same protocol and should work, but are unverified — [reports welcome](https://github.com/mehrshaad/nullpoint/issues).
+- Confirmed on **WH-1000XM6** (firmware 3.1.5) and **WH-CH720N**. Other Sony models use the same protocol and should work, but are unverified — [reports welcome](https://github.com/mehrshaad/nullpoint/issues).
 
 ## License
 

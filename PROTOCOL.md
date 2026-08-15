@@ -35,9 +35,15 @@ offer **zero** ports; including it offers exactly the headset.
 ### One controller at a time
 
 **verified** The headset serves audio to two devices (multipoint) but its control channel to
-**one**. While another host holds it, opening fails with `0x2740`
-(`WSAEADDRINUSE`, "only one usage of each socket address"). Sony's app does not need to be
-running for a phone to be holding it.
+**one at a time**. While another host holds it, opening fails with `0x2740` (`WSAEADDRINUSE`,
+"only one usage of each socket address"), and Sony's app does not need to be running for a
+phone to be holding it.
+
+The channel is **reclaimable**, though: retrying wins it back while the other device keeps
+playing audio, so controlling settings from a computer during phone playback does work. An
+earlier reading of this as a hard firmware limit was wrong — the retries were failing for an
+unrelated reason (the local port was never closed before being reopened, so every attempt died
+at `open()` before reaching the headset).
 
 ## Frame format
 
