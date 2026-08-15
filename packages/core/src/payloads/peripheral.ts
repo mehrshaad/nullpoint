@@ -21,6 +21,12 @@ export interface PairedDevice {
   address: string;
   name: string;
   connected: boolean;
+  /**
+   * Which multipoint slot this device occupies — 1 or 2 — or 0 when it isn't connected.
+   * `connectedStatus` is a slot number, not a flag: a device in slot 2 reports 2, so testing
+   * it for equality with 1 wrongly reports the second multipoint device as disconnected.
+   */
+  slot: number;
   kind: PairedDeviceKind;
   /** True for the device currently allowed to play audio (Sony calls this the playback right). */
   hasPlaybackRight: boolean;
@@ -72,7 +78,7 @@ export function decodePairedDevices(payload: Uint8Array): PairedDevice[] {
       const address = new TextDecoder("utf-8").decode(payload.subarray(offset, offset + ADDRESS_LENGTH));
       offset += ADDRESS_LENGTH;
 
-      const connected = payload[offset] === 1;
+      const slot = payload[offset] ?? 0;
       offset += 1;
 
       const cod = ((payload[offset]! << 16) | (payload[offset + 1]! << 8) | payload[offset + 2]!) >>> 0;
@@ -90,16 +96,20 @@ export function decodePairedDevices(payload: Uint8Array): PairedDevice[] {
       devices.push({
         address,
         name: name || address,
-        connected,
+        connected: slot > 0,
+        slot,
         kind: kindFromClassOfDevice(cod),
         hasPlaybackRight: false,
       });
     }
 
-    const playbackRightIndex = payload[offset];
-    if (playbackRightIndex !== undefined && devices[playbackRightIndex]) {
-      devices[playbackRightIndex]!.hasPlaybackRight = true;
-    }
+    // The trailing byte is the *slot* holding the playback right, matching the connectedStatus
+    // values above (Headphones.cpp:1365-1369 indexes a map keyed by slot). Reading it as a
+    // position in the list puts the badge on whichever device happens to sit at that index —
+    // in practice a disconnected one.
+    const playbackRightSlot = payload[offset] ?? 0;
+    const holder = playbackRightSlot > 0 && devices.find((d) => d.slot === playbackRightSlot);
+    if (holder) holder.hasPlaybackRight = true;
   } catch (err) {
     console.warn("[ssc/core] could not read the paired device list:", err);
     return [];

@@ -39,12 +39,16 @@ function ack(): Uint8Array {
   return packageDataForBt(DataType.ACK, 0, Uint8Array.from([]));
 }
 
-/** One device record as the headset lays it out: address, connected, 24-bit CoD, name. */
-function pairedDeviceRecord(address: string, connected: boolean, cod: number, name: string): number[] {
+/**
+ * One device record as the headset lays it out: address, multipoint slot, 24-bit CoD, name.
+ * `slot` is 0 when the device is merely paired, otherwise which of the two multipoint slots
+ * it occupies.
+ */
+function pairedDeviceRecord(address: string, slot: number, cod: number, name: string): number[] {
   const nameBytes = textBytes(name);
   return [
     ...textBytes(address),
-    connected ? 1 : 0,
+    slot,
     (cod >> 16) & 0xff,
     (cod >> 8) & 0xff,
     cod & 0xff,
@@ -109,8 +113,9 @@ function createFakeDevice({
   ];
 
   const deviceList = () => [
-    pairedDeviceRecord(IPHONE, state.connected.has(IPHONE), 0x5a020c, "Mehrshad's iPhone"),
-    pairedDeviceRecord(THINKPAD, state.connected.has(THINKPAD), 0x0c0104, "ThinkPad"),
+    pairedDeviceRecord(IPHONE, state.connected.has(IPHONE) ? 1 : 0, 0x5a020c, "Mehrshad's iPhone"),
+    // Slot 2, so a second multipoint device is not mistaken for a disconnected one.
+    pairedDeviceRecord(THINKPAD, state.connected.has(THINKPAD) ? 2 : 0, 0x0c0104, "ThinkPad"),
   ];
 
   return (sent: Uint8Array) => {
@@ -132,7 +137,7 @@ function createFakeDevice({
             PeripheralInquiredType.PAIRING_DEVICE_MANAGEMENT_WITH_BLUETOOTH_CLASS_OF_DEVICE,
             list.length,
             ...list.flat(),
-            0, // the iPhone holds the playback right
+            1, // slot 1 holds the playback right
           ])
         );
       }
@@ -171,9 +176,8 @@ function createFakeDevice({
       case CommandT1.CONNECT_GET_SUPPORT_FUNCTION: {
         const functions = [
           FunctionTypeT1.BATTERY_LEVEL_INDICATOR,
-          // A real WH-1000XM6 on FW 3.1.5 advertises *both* the plain level-adjustment
-          // function (0x6B) and the noise-adaptation one (0x6D), so the fake does too.
-          ...(noiseAdaptation ? [0x6b, 0x6d] : [0x6b]),
+          // A real WH-1000XM6 on FW 3.1.5 advertises 0x6D and *not* 0x6B.
+          noiseAdaptation ? 0x6d : 0x6b,
           ...(extras
             ? [
                 FunctionTypeT1.CONNECTION_MODE_SOUND_QUALITY_CONNECTION_QUALITY,
@@ -738,6 +742,7 @@ describe("Headphones.connect() over a fake device", () => {
         address: "AA:BB:CC:DD:EE:01",
         name: "Mehrshad's iPhone",
         connected: true,
+        slot: 1,
         kind: "phone",
         hasPlaybackRight: true,
       },
@@ -745,10 +750,62 @@ describe("Headphones.connect() over a fake device", () => {
         address: "AA:BB:CC:DD:EE:02",
         name: "ThinkPad",
         connected: false,
+        slot: 0,
         kind: "computer",
         hasPlaybackRight: false,
       },
     ]);
+  });
+
+  it("gives the playback right to the device in that slot, not that list position", async () => {
+    // Byte-for-byte the shape a real WH-1000XM6 sent: the connected laptop is in slot 1 and
+    // holds the playback right; the phone is merely paired and sits at list index 1. Reading
+    // the trailing byte as an index badges the phone, which is not even connected.
+    const transport = new LoopbackTransport(createFakeDevice({ table2: true }));
+    const hp = new Headphones(transport);
+    await hp.connect();
+
+    transport.emit(
+      packageDataForBt(
+        DataType.DATA_MDR_NO2,
+        0,
+        Uint8Array.from([
+          CommandT2.PERI_NTFY_PARAM,
+          PeripheralInquiredType.PAIRING_DEVICE_MANAGEMENT_WITH_BLUETOOTH_CLASS_OF_DEVICE,
+          2,
+          ...pairedDeviceRecord(THINKPAD, 1, 0x2e410c, "MEHRSHAD-LOQ"),
+          // Disconnected devices report an unknown class of device.
+          ...pairedDeviceRecord(IPHONE, 0, 0xffffff, "Mehrshad's iPhone"),
+          1, // playback right belongs to slot 1
+        ])
+      )
+    );
+
+    const [laptop, phone] = hp.state.pairedDevices!;
+    expect(laptop).toMatchObject({ name: "MEHRSHAD-LOQ", connected: true, hasPlaybackRight: true });
+    expect(phone).toMatchObject({ name: "Mehrshad's iPhone", connected: false, hasPlaybackRight: false });
+  });
+
+  it("counts a device in the second multipoint slot as connected", async () => {
+    const transport = new LoopbackTransport(createFakeDevice({ table2: true }));
+    const hp = new Headphones(transport);
+    await hp.connect();
+
+    transport.emit(
+      packageDataForBt(
+        DataType.DATA_MDR_NO2,
+        0,
+        Uint8Array.from([
+          CommandT2.PERI_NTFY_PARAM,
+          PeripheralInquiredType.PAIRING_DEVICE_MANAGEMENT_WITH_BLUETOOTH_CLASS_OF_DEVICE,
+          1,
+          ...pairedDeviceRecord(IPHONE, 2, 0x5a020c, "Mehrshad's iPhone"),
+          2,
+        ])
+      )
+    );
+
+    expect(hp.state.pairedDevices![0]).toMatchObject({ connected: true, slot: 2, hasPlaybackRight: true });
   });
 
   it("leaves the paired device list null on a device that doesn't speak Table 2", async () => {
@@ -782,8 +839,8 @@ describe("Headphones.connect() over a fake device", () => {
           CommandT2.PERI_NTFY_PARAM,
           PeripheralInquiredType.PAIRING_DEVICE_MANAGEMENT_WITH_BLUETOOTH_CLASS_OF_DEVICE,
           1,
-          ...pairedDeviceRecord("AA:BB:CC:DD:EE:02", true, 0x0c0104, "ThinkPad"),
-          0,
+          ...pairedDeviceRecord("AA:BB:CC:DD:EE:02", 1, 0x0c0104, "ThinkPad"),
+          1,
         ])
       )
     );
@@ -793,6 +850,7 @@ describe("Headphones.connect() over a fake device", () => {
         address: "AA:BB:CC:DD:EE:02",
         name: "ThinkPad",
         connected: true,
+        slot: 1,
         kind: "computer",
         hasPlaybackRight: true,
       },
@@ -874,7 +932,7 @@ describe("Headphones.connect() over a fake device", () => {
             CommandT2.PERI_NTFY_PARAM,
             PeripheralInquiredType.PAIRING_DEVICE_MANAGEMENT_WITH_BLUETOOTH_CLASS_OF_DEVICE,
             3,
-            ...pairedDeviceRecord("AA:BB:CC:DD:EE:02", true, 0x0c0104, "ThinkPad"),
+            ...pairedDeviceRecord("AA:BB:CC:DD:EE:02", 1, 0x0c0104, "ThinkPad"),
           ])
         )
       )
