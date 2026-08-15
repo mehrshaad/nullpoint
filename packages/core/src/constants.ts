@@ -78,6 +78,47 @@ export enum CommandT1 {
   NCASM_NTFY_PARAM = 0x69,
 }
 
+/**
+ * Protocol V2 **Table 2** command IDs — a separate command space carried in DATA_MDR_NO2
+ * frames, so the same byte means different things here and in CommandT1. Subset used by v1.
+ * ProtocolV2T2.h:33-47
+ */
+export enum CommandT2 {
+  PERI_GET_PARAM = 0x36,
+  PERI_RET_PARAM = 0x37,
+  PERI_SET_PARAM = 0x38,
+  PERI_NTFY_PARAM = 0x39,
+  /** How connect/disconnect is issued — the device list has no SET form. ProtocolV2T2.h:1024-1084 */
+  PERI_SET_EXTENDED_PARAM = 0x3c,
+  PERI_NTFY_EXTENDED_PARAM = 0x3d,
+}
+
+/** ProtocolV2T2.h:313-315 */
+export enum PeripheralInquiredType {
+  PAIRING_DEVICE_MANAGEMENT_CLASSIC_BT = 0x00,
+  PAIRING_DEVICE_MANAGEMENT_WITH_BLUETOOTH_CLASS_OF_DEVICE = 0x02,
+}
+
+/**
+ * ProtocolV2T2.h:932-937. `UNPAIR = 0x02` also exists and is deliberately left out: it cannot
+ * be undone from this app, and nothing in the product needs it.
+ */
+export enum ConnectivityActionType {
+  DISCONNECT = 0x00,
+  CONNECT = 0x01,
+}
+
+/**
+ * ProtocolV2T2.h:951-972. The high nibble repeats the action and the low nibble is the
+ * outcome, so the outcome alone is `result & 0x0f`.
+ */
+export enum PeripheralOutcome {
+  SUCCESS = 0x0,
+  ERROR = 0x1,
+  IN_PROGRESS = 0x2,
+  BUSY = 0x3,
+}
+
 /** ProtocolV2T1.h:382-395 */
 export enum ConnectInquiredType {
   FIXED_VALUE = 0,

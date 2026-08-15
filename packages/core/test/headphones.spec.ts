@@ -4,9 +4,12 @@ import { LoopbackTransport } from "../src/transport.js";
 import { decodeFrameBody, packageDataForBt } from "../src/framing.js";
 import {
   CommandT1,
+  CommandT2,
   ConnectInquiredType,
+  ConnectivityActionType,
   DataType,
   DeviceInfoType,
+  PeripheralInquiredType,
   PowerInquiredType,
   BatteryChargingStatus,
   NcAsmInquiredType,
@@ -26,13 +29,33 @@ function ack(): Uint8Array {
   return packageDataForBt(DataType.ACK, 0, Uint8Array.from([]));
 }
 
+/** One device record as the headset lays it out: address, connected, 24-bit CoD, name. */
+function pairedDeviceRecord(address: string, connected: boolean, cod: number, name: string): number[] {
+  const nameBytes = textBytes(name);
+  return [
+    ...textBytes(address),
+    connected ? 1 : 0,
+    (cod >> 16) & 0xff,
+    (cod >> 8) & 0xff,
+    cod & 0xff,
+    nameBytes.length,
+    ...nameBytes,
+  ];
+}
+
+const IPHONE = "AA:BB:CC:DD:EE:01";
+const THINKPAD = "AA:BB:CC:DD:EE:02";
+
 /**
  * A fake WH-1000XM6 that answers the v1 connect handshake and feature gets.
  *
  * It remembers what it was told, because the client reads state back after every write — a
  * stateless stub would report defaults and make correct code look broken.
+ *
+ * @param table2 whether to advertise and answer Protocol V2 Table 2. Off by default, so the
+ * majority of tests exercise the same path a device without it takes.
  */
-function createFakeDevice() {
+function createFakeDevice({ table2 = false }: { table2?: boolean } = {}) {
   const state = {
     ncAsm: {
       onOff: OnOff.ON as number,
@@ -42,17 +65,64 @@ function createFakeDevice() {
     },
     eqPreset: EqPresetId.CUSTOM as number,
     eqSteps: [13, 12, 10, 8, 13, 15],
+    // Which paired devices are currently connected. Mutated by connect/disconnect so the
+    // read-back that follows reports what actually happened.
+    connected: new Set([IPHONE]),
   };
 
+  const deviceList = () => [
+    pairedDeviceRecord(IPHONE, state.connected.has(IPHONE), 0x5a020c, "Mehrshad's iPhone"),
+    pairedDeviceRecord(THINKPAD, state.connected.has(THINKPAD), 0x0c0104, "ThinkPad"),
+  ];
+
   return (sent: Uint8Array) => {
-    const { payload } = decodeFrameBody(sent.subarray(1, sent.length - 1));
+    const { dataType, payload } = decodeFrameBody(sent.subarray(1, sent.length - 1));
     const command = payload[0] as CommandT1;
     const replies: Uint8Array[] = [ack()];
     const mdr = (bytes: number[]) => packageDataForBt(DataType.DATA_MDR, 0, Uint8Array.from(bytes));
+    const mdr2 = (bytes: number[]) => packageDataForBt(DataType.DATA_MDR_NO2, 0, Uint8Array.from(bytes));
+
+    if (dataType === DataType.DATA_MDR_NO2) {
+      if (payload[1] !== PeripheralInquiredType.PAIRING_DEVICE_MANAGEMENT_WITH_BLUETOOTH_CLASS_OF_DEVICE) {
+        return replies;
+      }
+      if (command === (CommandT2.PERI_GET_PARAM as number)) {
+        const list = deviceList();
+        replies.push(
+          mdr2([
+            CommandT2.PERI_RET_PARAM,
+            PeripheralInquiredType.PAIRING_DEVICE_MANAGEMENT_WITH_BLUETOOTH_CLASS_OF_DEVICE,
+            list.length,
+            ...list.flat(),
+            0, // the iPhone holds the playback right
+          ])
+        );
+      }
+      if (command === (CommandT2.PERI_SET_EXTENDED_PARAM as number)) {
+        const action = payload[2]!;
+        const address = new TextDecoder().decode(payload.subarray(3, 20));
+        if (action === ConnectivityActionType.CONNECT) state.connected.add(address);
+        else state.connected.delete(address);
+        replies.push(
+          mdr2([
+            CommandT2.PERI_NTFY_EXTENDED_PARAM,
+            PeripheralInquiredType.PAIRING_DEVICE_MANAGEMENT_WITH_BLUETOOTH_CLASS_OF_DEVICE,
+            action,
+            // High nibble repeats the action, low nibble is the outcome.
+            action === ConnectivityActionType.CONNECT ? 0x10 : 0x00,
+            ...textBytes(address),
+          ])
+        );
+      }
+      return replies;
+    }
 
     switch (command) {
       case CommandT1.CONNECT_GET_PROTOCOL_INFO:
-        replies.push(mdr([CommandT1.CONNECT_RET_PROTOCOL_INFO, ConnectInquiredType.FIXED_VALUE, 0, 0, 0, 2, 0, 1]));
+        // payload[7] === 0 means "supports Table 2"; anything else means it does not.
+        replies.push(
+          mdr([CommandT1.CONNECT_RET_PROTOCOL_INFO, ConnectInquiredType.FIXED_VALUE, 0, 0, 0, 2, 0, table2 ? 0 : 1])
+        );
         break;
       case CommandT1.CONNECT_GET_DEVICE_INFO: {
         const type = payload[1] as DeviceInfoType;
@@ -318,6 +388,164 @@ describe("Headphones.connect() over a fake device", () => {
     hp.on((e) => events.push(e.type));
     transport.simulateDisconnect();
     expect(events).toEqual(["disconnected"]);
+  });
+
+  it("reads the paired device list, with a kind per Bluetooth Class of Device", async () => {
+    const transport = new LoopbackTransport(createFakeDevice({ table2: true }));
+    const hp = new Headphones(transport);
+    await hp.connect();
+    // connect() kicks this off without waiting for it, so ask outright rather than racing it.
+    const devices = await hp.refreshPairedDevices();
+
+    expect(devices).toEqual([
+      {
+        address: "AA:BB:CC:DD:EE:01",
+        name: "Mehrshad's iPhone",
+        connected: true,
+        kind: "phone",
+        hasPlaybackRight: true,
+      },
+      {
+        address: "AA:BB:CC:DD:EE:02",
+        name: "ThinkPad",
+        connected: false,
+        kind: "computer",
+        hasPlaybackRight: false,
+      },
+    ]);
+  });
+
+  it("leaves the paired device list null on a device that doesn't speak Table 2", async () => {
+    const transport = new LoopbackTransport(createFakeDevice());
+    const hp = new Headphones(transport);
+    const state = await hp.connect();
+
+    // Not an error: the panel simply has nothing to show. And we must not have spent a
+    // request on a table the headset told us it doesn't implement.
+    expect(state.pairedDevices).toBeNull();
+    const table2Frames = transport.sent
+      .map((f) => decodeFrameBody(f.subarray(1, f.length - 1)))
+      .filter((f) => f.dataType === DataType.DATA_MDR_NO2);
+    expect(table2Frames).toEqual([]);
+  });
+
+  it("updates the device list live when the headset announces a connection change", async () => {
+    const transport = new LoopbackTransport(createFakeDevice({ table2: true }));
+    const hp = new Headphones(transport);
+    await hp.connect();
+
+    const events: Array<{ type: string }> = [];
+    hp.on((e) => events.push(e));
+
+    // The phone disconnects; the headset pushes the new list unprompted.
+    transport.emit(
+      packageDataForBt(
+        DataType.DATA_MDR_NO2,
+        0,
+        Uint8Array.from([
+          CommandT2.PERI_NTFY_PARAM,
+          PeripheralInquiredType.PAIRING_DEVICE_MANAGEMENT_WITH_BLUETOOTH_CLASS_OF_DEVICE,
+          1,
+          ...pairedDeviceRecord("AA:BB:CC:DD:EE:02", true, 0x0c0104, "ThinkPad"),
+          0,
+        ])
+      )
+    );
+
+    expect(hp.state.pairedDevices).toEqual([
+      {
+        address: "AA:BB:CC:DD:EE:02",
+        name: "ThinkPad",
+        connected: true,
+        kind: "computer",
+        hasPlaybackRight: true,
+      },
+    ]);
+    expect(events.map((e) => e.type)).toContain("pairedDevices");
+  });
+
+  it("disconnects a paired device and reflects it in the refreshed list", async () => {
+    const transport = new LoopbackTransport(createFakeDevice({ table2: true }));
+    const hp = new Headphones(transport);
+    await hp.connect();
+    await hp.refreshPairedDevices();
+    expect(hp.state.pairedDevices?.find((d) => d.address === IPHONE)?.connected).toBe(true);
+
+    await hp.setDeviceConnection(IPHONE, false);
+
+    // Sent as PERI_SET_EXTENDED_PARAM — the device list itself has no SET form.
+    const sets = transport.sent
+      .map((f) => decodeFrameBody(f.subarray(1, f.length - 1)))
+      .filter(
+        (f) => f.dataType === DataType.DATA_MDR_NO2 && f.payload[0] === (CommandT2.PERI_SET_EXTENDED_PARAM as number)
+      );
+    expect(sets.length).toBe(1);
+    expect(sets[0]!.payload[2]).toBe(ConnectivityActionType.DISCONNECT);
+    expect(hp.state.pairedDevices?.find((d) => d.address === IPHONE)?.connected).toBe(false);
+  });
+
+  it("connects a paired device that wasn't connected", async () => {
+    const transport = new LoopbackTransport(createFakeDevice({ table2: true }));
+    const hp = new Headphones(transport);
+    await hp.connect();
+
+    await hp.setDeviceConnection(THINKPAD, true);
+    expect(hp.state.pairedDevices?.find((d) => d.address === THINKPAD)?.connected).toBe(true);
+  });
+
+  it("reports a refusal rather than pretending the device connected", async () => {
+    const device = createFakeDevice({ table2: true });
+    const transport = new LoopbackTransport((sent) => {
+      const { dataType, payload } = decodeFrameBody(sent.subarray(1, sent.length - 1));
+      if (dataType === DataType.DATA_MDR_NO2 && payload[0] === (CommandT2.PERI_SET_EXTENDED_PARAM as number)) {
+        return [
+          packageDataForBt(DataType.ACK, 0, Uint8Array.from([])),
+          packageDataForBt(
+            DataType.DATA_MDR_NO2,
+            0,
+            Uint8Array.from([
+              CommandT2.PERI_NTFY_EXTENDED_PARAM,
+              PeripheralInquiredType.PAIRING_DEVICE_MANAGEMENT_WITH_BLUETOOTH_CLASS_OF_DEVICE,
+              ConnectivityActionType.CONNECT,
+              0x11, // CONNECTION_ERROR
+              ...textBytes(THINKPAD),
+            ])
+          ),
+        ];
+      }
+      return device(sent);
+    });
+    const hp = new Headphones(transport);
+    await hp.connect();
+
+    await expect(hp.setDeviceConnection(THINKPAD, true)).rejects.toThrow(/refused/i);
+    expect(hp.state.pairedDevices?.find((d) => d.address === THINKPAD)?.connected).toBe(false);
+  });
+
+  it("survives a truncated device list instead of tearing down the session", async () => {
+    const transport = new LoopbackTransport(createFakeDevice({ table2: true }));
+    const hp = new Headphones(transport);
+    await hp.connect();
+
+    // Claims three devices but carries one. Decoding runs on the read loop, so throwing here
+    // would end the connection outright (PLAN.md standing rule 1).
+    expect(() =>
+      transport.emit(
+        packageDataForBt(
+          DataType.DATA_MDR_NO2,
+          0,
+          Uint8Array.from([
+            CommandT2.PERI_NTFY_PARAM,
+            PeripheralInquiredType.PAIRING_DEVICE_MANAGEMENT_WITH_BLUETOOTH_CLASS_OF_DEVICE,
+            3,
+            ...pairedDeviceRecord("AA:BB:CC:DD:EE:02", true, 0x0c0104, "ThinkPad"),
+          ])
+        )
+      )
+    ).not.toThrow();
+
+    await hp.setNoiseMode("ambient");
+    expect(hp.state.ncAsm?.mode).toBe(NcAsmMode.ASM);
   });
 
   it("clamps ambient level to the device's minimum of 1 on the wire, then reconciles to it", async () => {

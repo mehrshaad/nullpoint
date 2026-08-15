@@ -4,6 +4,7 @@ import { AmbientSoundMode, BatteryChargingStatus, EqPresetId, noiseModeFromState
 import { customEqKey } from "../state/useSettings.js";
 import { TitleBar } from "./TitleBar.js";
 import { DeviceArt } from "../components/DeviceArt.js";
+import { ConnectedDevices } from "../components/ConnectedDevices.js";
 import { NoiseModeSegmented } from "../components/NoiseModeSegmented.js";
 import { AmbientLevelSlider } from "../components/AmbientLevelSlider.js";
 import { EqualizerPanel } from "../components/EqualizerPanel.js";
@@ -305,6 +306,18 @@ export function Dashboard({
           />
         ) : (
           <div />
+        )}
+
+        {/* Full width beneath both panels: a list reads better wide than in a narrow column,
+            and it stays a single column on small screens for free. Absent entirely on devices
+            that don't report a paired-device list rather than shown empty. */}
+        {state.pairedDevices && (
+          <div style={{ gridColumn: "1 / -1" }}>
+            <ConnectedDevices
+              devices={state.pairedDevices}
+              onSetConnection={(address, connect) => headphones.setDeviceConnection(address, connect)}
+            />
+          </div>
         )}
       </div>
     </div>

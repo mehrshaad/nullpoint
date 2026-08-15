@@ -33,20 +33,29 @@ Shipped as a result:
 - All commands are serialised, since the link carries one request/response at a time and
   overlapping commands were orphaning each other's acknowledgement.
 
-## Phase 1 — Connected devices (Table 2)
+## Phase 1 — Connected devices (Table 2) — built, unverified on hardware
 
-Show every device the headphones are paired with and which are connected, and switch between
-them. Requires implementing **Table 2** (`DATA_MDR_NO2`), which the codebase does not speak yet;
-everything else in this phase depends on that groundwork.
+**Table 2 (`DATA_MDR_NO2`) is implemented**, and with it the "CONNECTED TO" panel: every device
+the headphones are paired with, which are connected, which holds the playback right, an icon per
+device type from the Bluetooth Class of Device, and a Connect / Disconnect button per row. The
+list updates itself from the headset's own notifications when a device comes or goes.
 
-- `PeripheralGetParam(PAIRING_DEVICE_MANAGEMENT_WITH_BLUETOOTH_CLASS_OF_DEVICE)` returns, per
-  device: MAC, connected status, 24-bit Bluetooth Class of Device, and friendly name.
-- The Class of Device gives us the device *type*, so each row gets a real icon (phone, laptop,
-  speaker) rather than a generic dot.
-- Connect / disconnect a specific device, and toggle pairing mode.
+Details worth remembering are in [`PROTOCOL.md`](./PROTOCOL.md) — in particular that Table 2 is a
+separate command space (response listeners are keyed by frame type *and* command), and that the
+device list has no SET form, so connect/disconnect goes through `PERI_SET_EXTENDED_PARAM`.
 
-**Done when:** a Devices panel lists e.g. "Mehrshad's iPhone — connected" and "ThinkPad —
-paired", with correct icons, and the user can connect or disconnect one from the app.
+The paired-device fetch is deliberately **not** awaited by `connect()`: a headset that advertises
+Table 2 without answering the peripheral inquiry would otherwise add the full response timeout to
+every connection.
+
+**Still open:**
+
+- **Nobody has seen this against real hardware yet.** It is unknown whether a WH-1000XM6 on
+  FW 3.1.5 reports Table 2 support at all; if it doesn't, the panel correctly never appears, and
+  the work needed is to find out rather than to write more code. This is exactly the trap
+  standing rule 2 describes.
+- Pairing mode (put the headset into pairing) is not implemented.
+- Unpair is deliberately left out: irreversible from the app, and nothing needs it.
 
 ---
 

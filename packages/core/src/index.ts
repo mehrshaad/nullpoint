@@ -6,3 +6,4 @@ export * from "./payloads/init.js";
 export * from "./payloads/battery.js";
 export * from "./payloads/ncasm.js";
 export * from "./payloads/eq.js";
+export * from "./payloads/peripheral.js";

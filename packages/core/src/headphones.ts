@@ -1,13 +1,24 @@
 // Ported from mos9527/SonyHeadphonesClient (MIT) — see /NOTICE.
 // Orchestration source: src/Headphones.{h,cpp} @ master (selectively — see PLAN.md §6 porting map).
 
-import { CommandT1, DataType, DeviceInfoType, EqPresetId, PowerInquiredType } from "./constants.js";
+import {
+  CommandT1,
+  CommandT2,
+  ConnectivityActionType,
+  DataType,
+  DeviceInfoType,
+  EqPresetId,
+  PeripheralInquiredType,
+  PeripheralOutcome,
+  PowerInquiredType,
+} from "./constants.js";
 import { FrameReassembler, packageDataForBt, type DecodedFrame } from "./framing.js";
 import type { Transport } from "./transport.js";
 import * as Init from "./payloads/init.js";
 import * as Battery from "./payloads/battery.js";
 import * as NcAsm from "./payloads/ncasm.js";
 import * as Eq from "./payloads/eq.js";
+import * as Peripheral from "./payloads/peripheral.js";
 
 export interface HeadphonesState {
   modelName: string | null;
@@ -16,6 +27,8 @@ export interface HeadphonesState {
   battery: Battery.BatteryStatus | null;
   ncAsm: NcAsm.NcAsmState | null;
   eq: Eq.EqState | null;
+  /** Null until asked for, and on devices that don't speak Table 2. Empty array = asked, none. */
+  pairedDevices: Peripheral.PairedDevice[] | null;
 }
 
 /**
@@ -29,6 +42,7 @@ export type HeadphonesEvent =
   | { type: "battery"; state: Battery.BatteryStatus }
   | { type: "ncAsm"; state: NcAsm.NcAsmState; origin: StateOrigin }
   | { type: "eq"; state: Eq.EqState; origin: StateOrigin }
+  | { type: "pairedDevices"; devices: Peripheral.PairedDevice[] }
   | { type: "deviceInfo" }
   | { type: "writeFailed"; feature: "ncAsm" | "eq" }
   /**
@@ -69,6 +83,7 @@ export class Headphones {
     battery: null,
     ncAsm: null,
     eq: null,
+    pairedDevices: null,
   };
 
   constructor(private transport: Transport) {
@@ -117,6 +132,7 @@ export class Headphones {
     if (!protocolInfo.supportsTable1) {
       throw new Error("Unsupported device: does not support MDR V2 Table 1");
     }
+    this.supportsTable2 = protocolInfo.supportsTable2;
 
     const modelInfo = Init.decodeRetDeviceInfoString(
       await this.request(DataType.DATA_MDR, Init.encodeGetDeviceInfo(DeviceInfoType.MODEL_NAME), CommandT1.CONNECT_RET_DEVICE_INFO)
@@ -138,11 +154,77 @@ export class Headphones {
     await this.request(DataType.DATA_MDR, Eq.encodeGetEq(), CommandT1.EQEBB_RET_PARAM);
 
     this.startBatteryRefresh();
+
+    // Deliberately not awaited. A headset that advertises Table 2 but doesn't answer the
+    // peripheral inquiry would otherwise add the full response timeout to every connect, and
+    // the dashboard has nothing to gain from waiting — the panel fills itself in when the
+    // answer arrives, or never appears at all.
+    void this.refreshPairedDevices();
+
     return this.state;
+  }
+
+  /**
+   * Ask which devices the headset is paired with and which of them are connected. Table 2 is
+   * optional, and even devices that report support for it may not implement the peripheral
+   * inquiry, so a failure here is not a failed connection — the panel just stays hidden.
+   */
+  async refreshPairedDevices(): Promise<Peripheral.PairedDevice[] | null> {
+    if (!this.supportsTable2) return null;
+    try {
+      const payload = await this.request(
+        DataType.DATA_MDR_NO2,
+        Peripheral.encodeGetPairedDevices(),
+        CommandT2.PERI_RET_PARAM
+      );
+      return this.adoptPairedDevices(payload);
+    } catch (err) {
+      console.warn("[ssc/core] the headset did not report its paired devices:", err);
+      return null;
+    }
+  }
+
+  /**
+   * Connect or disconnect one of the paired devices.
+   *
+   * Resolves once the headset reports the outcome, which can legitimately be "in progress" —
+   * a Bluetooth connection takes a moment to come up, and the headset announces the finished
+   * device list separately when it does. Rejects only on a refusal we can state plainly.
+   *
+   * Note this can be used to disconnect the very machine we're talking through; that drops the
+   * link, and the reconnect loop then behaves exactly as it does for any other disconnection.
+   */
+  async setDeviceConnection(address: string, connect: boolean): Promise<void> {
+    const action = connect ? ConnectivityActionType.CONNECT : ConnectivityActionType.DISCONNECT;
+    const response = await this.request(
+      DataType.DATA_MDR_NO2,
+      Peripheral.encodeSetDeviceConnection(address, action),
+      CommandT2.PERI_NTFY_EXTENDED_PARAM
+    );
+    const { outcome } = Peripheral.decodeConnectivityResult(response);
+    if (outcome === PeripheralOutcome.ERROR || outcome === PeripheralOutcome.BUSY) {
+      throw new Error(
+        outcome === PeripheralOutcome.BUSY
+          ? "The headphones are busy — try again in a moment."
+          : `The headphones refused to ${connect ? "connect to" : "disconnect from"} that device.`
+      );
+    }
+    this.noteResponsive();
+    // The list is stale the instant this lands, and the headset's own notification may lag
+    // behind a connection that is still coming up.
+    await this.refreshPairedDevices();
+  }
+
+  private adoptPairedDevices(payload: Uint8Array): Peripheral.PairedDevice[] {
+    const devices = Peripheral.decodePairedDevices(payload);
+    this.state.pairedDevices = devices;
+    this.emit({ type: "pairedDevices", devices });
+    return devices;
   }
 
   private batteryTimer: ReturnType<typeof setInterval> | null = null;
   private hasControl = true;
+  private supportsTable2 = false;
 
   /** True while the headset is still accepting our commands. */
   get controllable(): boolean {
@@ -205,6 +287,9 @@ export class Headphones {
       // burn the timeout waiting behind another command.
       await this.enqueue(async () => {
         const settled = this.waitForSettledNcAsm(CONFIRM_TIMEOUT_MS);
+        // If the write itself fails we never reach the await below, so claim the rejection
+        // now — an unowned one surfaces as an unhandled rejection well after we've recovered.
+        settled.catch(() => undefined);
         await this.sendNow(DataType.DATA_MDR, NcAsm.encodeSetNcAsm(next));
         await settled;
       });
@@ -243,7 +328,7 @@ export class Headphones {
       const timer = setTimeout(() => finish(false), timeoutMs);
       for (const command of [CommandT1.NCASM_NTFY_PARAM, CommandT1.NCASM_RET_PARAM]) {
         unsubscribes.push(
-          this.onRawResponse(command, (payload) => {
+          this.onRawResponse(DataType.DATA_MDR, command, (payload) => {
             if (NcAsm.decodeNcAsm(payload).settled) finish(true);
           })
         );
@@ -380,7 +465,11 @@ export class Headphones {
   }
 
   /** Send a command and wait for its typed RET response (not just the ACK). */
-  private request(dataType: DataType, data: Uint8Array, expectCommand: CommandT1): Promise<Uint8Array> {
+  private request(
+    dataType: DataType,
+    data: Uint8Array,
+    expectCommand: CommandT1 | CommandT2
+  ): Promise<Uint8Array> {
     // Queued as one unit: the listener must be armed before the write, and no other command
     // may interleave between the two.
     return this.enqueue(async () => {
@@ -389,24 +478,37 @@ export class Headphones {
           unsubscribe();
           reject(new Error(`Timed out waiting for response 0x${expectCommand.toString(16)}`));
         }, ACK_TIMEOUT_MS);
-        const unsubscribe = this.onRawResponse(expectCommand, (payload) => {
+        const unsubscribe = this.onRawResponse(dataType, expectCommand, (payload) => {
           clearTimeout(timer);
           unsubscribe();
           resolve(payload);
         });
       });
+      // Same reason as in writeNcAsm: a failed write means nothing ever awaits this, and its
+      // own timeout would then reject into the void.
+      responsePromise.catch(() => undefined);
       await this.sendNow(dataType, data);
       return responsePromise;
     });
   }
 
-  private rawResponseListeners = new Map<number, Set<(payload: Uint8Array) => void>>();
+  private rawResponseListeners = new Map<string, Set<(payload: Uint8Array) => void>>();
 
-  private onRawResponse(command: CommandT1, cb: (payload: Uint8Array) => void): () => void {
-    let set = this.rawResponseListeners.get(command);
+  /**
+   * Keyed by frame type as well as command: Table 1 and Table 2 are separate command spaces
+   * carried in different frames, so the same byte means different things in each and a bare
+   * command number would cross-wire them.
+   */
+  private onRawResponse(
+    dataType: DataType,
+    command: CommandT1 | CommandT2,
+    cb: (payload: Uint8Array) => void
+  ): () => void {
+    const key = `${dataType}:${command}`;
+    let set = this.rawResponseListeners.get(key);
     if (!set) {
       set = new Set();
-      this.rawResponseListeners.set(command, set);
+      this.rawResponseListeners.set(key, set);
     }
     set.add(cb);
     return () => set!.delete(cb);
@@ -420,15 +522,22 @@ export class Headphones {
       this.pendingAck?.();
       return;
     }
-    if (frame.dataType !== DataType.DATA_MDR || frame.payload.length === 0) return;
+    const isTable1 = frame.dataType === DataType.DATA_MDR;
+    const isTable2 = frame.dataType === DataType.DATA_MDR_NO2;
+    if ((!isTable1 && !isTable2) || frame.payload.length === 0) return;
 
     // Acknowledge before handling: the device will not send its next frame until we do.
     void this.sendAck(frame.seq);
 
-    const command = frame.payload[0] as CommandT1;
-    for (const cb of this.rawResponseListeners.get(command) ?? []) cb(frame.payload);
+    const command = frame.payload[0]!;
+    for (const cb of this.rawResponseListeners.get(`${frame.dataType}:${command}`) ?? []) cb(frame.payload);
 
-    switch (command) {
+    if (isTable2) {
+      this.handleTable2(command, frame.payload);
+      return;
+    }
+
+    switch (command as CommandT1) {
       case CommandT1.POWER_RET_STATUS:
       case CommandT1.POWER_NTFY_STATUS: {
         if (frame.payload[1] === PowerInquiredType.BATTERY) {
@@ -454,6 +563,22 @@ export class Headphones {
         const eq = Eq.decodeEq(frame.payload);
         this.state.eq = eq;
         this.emit({ type: "eq", state: eq, origin: command === CommandT1.EQEBB_NTFY_PARAM ? "device" : "local" });
+        break;
+      }
+    }
+  }
+
+  /**
+   * Table 2 frames. The headset pushes PERI_NTFY_PARAM whenever a device connects or
+   * disconnects, so the panel stays live without polling.
+   */
+  private handleTable2(command: number, payload: Uint8Array): void {
+    switch (command) {
+      case CommandT2.PERI_RET_PARAM:
+      case CommandT2.PERI_NTFY_PARAM: {
+        if (payload[1] === PeripheralInquiredType.PAIRING_DEVICE_MANAGEMENT_WITH_BLUETOOTH_CLASS_OF_DEVICE) {
+          this.adoptPairedDevices(payload);
+        }
         break;
       }
     }

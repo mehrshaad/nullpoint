@@ -98,19 +98,61 @@ send. Selecting it with an empty band list is silently ignored — send the band
 `OFF 0x00`, `HEAVY 0x30`, `CLEAR 0x31`, `HARD 0x32`, `SOFT 0x33`, `CUSTOM 0xA0`,
 `USER_SETTING1..5 0xA1..0xA5`, `UNSPECIFIED 0xFF`.
 
-## Paired device list (Table 2, not yet implemented)
+## Table 2 — paired devices
 
-`PeripheralGetParam(PAIRING_DEVICE_MANAGEMENT_WITH_BLUETOOTH_CLASS_OF_DEVICE)` returns one
-record per paired device:
+Table 2 rides in `DATA_MDR_NO2` frames and is an entirely **separate command space** from
+Table 1: the same byte means different things in each, so response listeners must be keyed by
+frame type as well as command. Availability is reported by byte 7 of
+`CONNECT_RET_PROTOCOL_INFO` (0 = supported), and `CONNECT_GET_PROTOCOL_INFO` is answered before
+anything else, so there is never a reason to guess.
+
+### Reading the list
+
+`PERI_GET_PARAM (0x36)` with inquired type
+`PAIRING_DEVICE_MANAGEMENT_WITH_BLUETOOTH_CLASS_OF_DEVICE (0x02)` →
+`PERI_RET_PARAM (0x37)`:
+
+```
+[command][inquiredType][deviceCount]
+  per device: [address:17 ASCII][connectedStatus:1][classOfDevice:3 BE][nameLen:1][name]
+[playbackRightDeviceIndex:1]
+```
 
 | Field | Notes |
 |---|---|
 | `btDeviceAddress` | 17 ASCII bytes, `XX:XX:XX:XX:XX:XX`, no terminator |
 | `connectedStatus` | 1 byte |
-| `bluetoothClassOfDevice` | 24-bit big-endian; identifies phone / computer / audio device |
-| `btFriendlyName` | length-prefixed string |
+| `bluetoothClassOfDevice` | 24-bit big-endian. Major device class is bits 8–12: `0x01` computer, `0x02` phone, `0x04` audio/video, `0x07` wearable |
+| `btFriendlyName` | length-prefixed; **may legitimately be empty**, even though Sony's own app requires at least one character ([mos9527#21](https://github.com/mos9527/SonyHeadphonesClient/issues/21)) |
 
-Requires Table 2 support (`DATA_MDR_NO2`) and the pairing-device-management capability.
+The trailing byte is an *index into the list*, not an address — the device currently holding
+the playback right. Inquired type `0x00` returns the same shape **without** the class-of-device
+field; don't parse one with the other's layout.
+
+The headset pushes `PERI_NTFY_PARAM (0x39)` with the whole list again whenever a device
+connects or disconnects, so this never needs polling.
+
+### Connecting and disconnecting
+
+There is **no SET form of the device list** — `PeripheralParam…`'s set slot is `UNKNOWN`
+upstream. Connect/disconnect goes through `PERI_SET_EXTENDED_PARAM (0x3C)` instead:
+
+```
+[0x3C][inquiredType][connectivityActionType][address:17 ASCII]
+```
+
+with `DISCONNECT = 0x00`, `CONNECT = 0x01`, `UNPAIR = 0x02` (Nullpoint deliberately does not
+expose unpair). The reply is `PERI_NTFY_EXTENDED_PARAM (0x3D)`:
+
+```
+[0x3D][inquiredType][connectivityActionType][result][address:17 ASCII]
+```
+
+`result`'s high nibble repeats the action and the low nibble is the outcome — `0` success,
+`1` error, `2` in progress, `3` busy. "In progress" is a normal answer, not a failure: the
+finished state arrives later as a `PERI_NTFY_PARAM` list.
+
+Disconnecting the machine you are talking through is legal, and simply drops your own link.
 
 ## Source map
 

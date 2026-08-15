@@ -39,6 +39,8 @@ function useFrame(mode: NoiseMode): Uint8Array {
           mode: mode === "anc" ? NcAsmMode.NC : NcAsmMode.ASM,
           ambientMode: AmbientSoundMode.NORMAL,
           ambientLevel: 14,
+          // Only read back off the wire, never sent — a value we're setting is by definition final.
+          settled: true,
         })
       ),
     [mode]
