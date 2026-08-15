@@ -21,6 +21,7 @@ export function App() {
         settings={settings}
         update={update}
         isDesktop={isDesktop}
+        deviceState={deviceState}
         onDone={() => setShowSettings(false)}
       />
     );

@@ -51,6 +51,8 @@ declare global {
   interface Window {
     nullpoint?: NullpointBridge;
   }
+  /** Substituted at build time from package.json — see vite.config.ts. */
+  const __APP_VERSION__: string;
 }
 
 const STORAGE_KEY = "nullpoint.settings";

@@ -1,8 +1,14 @@
-import { copyFileSync, mkdirSync } from "node:fs";
+import { copyFileSync, mkdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
+
+// Taken from package.json rather than typed into the About panel, where it sat a release out
+// of date without anyone noticing.
+const { version } = JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf8")) as {
+  version: string;
+};
 
 /**
  * GitHub Pages has no SPA rewrite. Emitting the document at /app/index.html means that route
@@ -44,6 +50,9 @@ export default defineConfig({
       },
     }),
   ],
+  define: {
+    __APP_VERSION__: JSON.stringify(version),
+  },
   server: {
     port: 5173
   },
