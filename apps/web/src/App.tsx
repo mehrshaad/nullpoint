@@ -22,6 +22,7 @@ export function App() {
         update={update}
         isDesktop={isDesktop}
         deviceState={deviceState}
+        onPowerOff={headphones ? () => void headphones.powerOff() : undefined}
         onDone={() => setShowSettings(false)}
       />
     );

@@ -317,9 +317,11 @@ export function Dashboard({
           connectionMode={state.connectionMode}
           upscaling={state.upscaling}
           speakToChat={state.speakToChat}
+          pauseOnRemoval={state.pauseOnRemoval}
           onConnectionModeChange={(mode) => void headphones.setConnectionMode(mode)}
           onUpscalingChange={(value) => void headphones.setUpscaling(value)}
           onSpeakToChatChange={(next) => void headphones.setSpeakToChat(next)}
+          onPauseOnRemovalChange={(enabled) => void headphones.setPauseOnRemoval(enabled)}
         />
 
         {/* Flows into the second column beside SOUND & SPEECH rather than spanning the width:

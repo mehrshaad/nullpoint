@@ -31,6 +31,7 @@ export function Settings({
   update,
   isDesktop,
   deviceState,
+  onPowerOff,
   onDone,
 }: {
   settings: AppSettings;
@@ -38,6 +39,8 @@ export function Settings({
   isDesktop: boolean;
   /** Null when nothing is connected — the capability panel then just says so. */
   deviceState: HeadphonesState | null;
+  /** Absent when nothing is connected. */
+  onPowerOff?: () => void;
   onDone: () => void;
 }) {
   const rows = TOGGLE_ROWS.filter((row) => isDesktop || !row.desktopOnly);
@@ -156,6 +159,46 @@ export function Settings({
           WHAT YOUR HEADPHONES REPORT
         </div>
         <CapabilityReport state={deviceState} />
+
+        {deviceState?.canPowerOff && onPowerOff && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 16,
+              flexWrap: "wrap",
+              padding: "14px 16px",
+              border: "1px solid var(--line)",
+              borderRadius: 10,
+              background: "var(--panel)",
+            }}
+          >
+            <div style={{ flex: "1 1 200px", minWidth: 0 }}>
+              <div style={{ fontWeight: 500, fontSize: 13, color: "var(--fg)" }}>Turn off headphones</div>
+              <div className="mono" style={{ marginTop: 4, fontSize: 11, color: "var(--fg3)" }}>
+                DISCONNECTS — USE THEIR POWER BUTTON TO COME BACK
+              </div>
+            </div>
+            <button
+              onClick={onPowerOff}
+              className="mono"
+              style={{
+                flex: "none",
+                fontWeight: 500,
+                fontSize: 11,
+                letterSpacing: "0.08em",
+                padding: "8px 12px",
+                borderRadius: 7,
+                cursor: "pointer",
+                color: "var(--warn)",
+                background: "none",
+                border: "1px solid var(--warn-line)",
+              }}
+            >
+              TURN OFF
+            </button>
+          </div>
+        )}
 
         <div className="mono" style={{ fontWeight: 600, fontSize: 11, letterSpacing: "0.14em", color: "var(--fg3)" }}>
           ABOUT

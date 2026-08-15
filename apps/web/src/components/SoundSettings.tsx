@@ -85,18 +85,24 @@ export function SoundSettings({
   connectionMode,
   upscaling,
   speakToChat,
+  pauseOnRemoval,
   onConnectionModeChange,
   onUpscalingChange,
   onSpeakToChatChange,
+  onPauseOnRemovalChange,
 }: {
   connectionMode: PriorMode | null;
   upscaling: UpscalingTypeAutoOff | null;
   speakToChat: SpeakToChatState | null;
+  pauseOnRemoval: boolean | null;
   onConnectionModeChange: (mode: PriorMode) => void;
   onUpscalingChange: (value: UpscalingTypeAutoOff) => void;
   onSpeakToChatChange: (next: SpeakToChatState) => void;
+  onPauseOnRemovalChange: (enabled: boolean) => void;
 }) {
-  if (connectionMode === null && upscaling === null && speakToChat === null) return null;
+  if (connectionMode === null && upscaling === null && speakToChat === null && pauseOnRemoval === null) {
+    return null;
+  }
 
   return (
     <div
@@ -139,6 +145,12 @@ export function SoundSettings({
             onChange={(on) => onUpscalingChange(on ? UpscalingTypeAutoOff.AUTO : UpscalingTypeAutoOff.OFF)}
             ariaLabel="DSEE Extreme"
           />
+        </Row>
+      )}
+
+      {pauseOnRemoval !== null && (
+        <Row label="Pause when removed" hint="Stops playback when you take them off">
+          <Switch checked={pauseOnRemoval} onChange={onPauseOnRemovalChange} ariaLabel="Pause when removed" />
         </Row>
       )}
 

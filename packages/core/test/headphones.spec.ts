@@ -19,6 +19,7 @@ import {
   DeviceInfoType,
   PeripheralInquiredType,
   PowerInquiredType,
+  PowerOffSettingValue,
   BatteryChargingStatus,
   NcAsmInquiredType,
   OnOff,
@@ -86,6 +87,8 @@ function createFakeDevice({
     stcEnabled: false,
     stcSensitivity: DetectSensitivity.AUTO as number,
     stcTimeout: ModeOutTime.MID as number,
+    pauseOnRemoval: true,
+    poweredOff: false,
     eqPreset: EqPresetId.CUSTOM as number,
     eqSteps: [13, 12, 10, 8, 13, 15],
     // Which paired devices are currently connected. Mutated by connect/disconnect so the
@@ -175,6 +178,8 @@ function createFakeDevice({
                 FunctionTypeT1.CONNECTION_MODE_SOUND_QUALITY_CONNECTION_QUALITY,
                 FunctionTypeT1.UPSCALING_AUTO_OFF,
                 FunctionTypeT1.SMART_TALKING_MODE_TYPE2,
+                FunctionTypeT1.PLAYBACK_CONTROL_BY_WEARING_REMOVING_HEADPHONE_ON_OFF,
+                FunctionTypeT1.POWER_OFF,
               ]
             : []),
         ];
@@ -205,6 +210,16 @@ function createFakeDevice({
         break; // ACK only
 
       case CommandT1.SYSTEM_GET_PARAM:
+        if (payload[1] === SystemInquiredType.PLAYBACK_CONTROL_BY_WEARING) {
+          replies.push(
+            mdr([
+              CommandT1.SYSTEM_RET_PARAM,
+              SystemInquiredType.PLAYBACK_CONTROL_BY_WEARING,
+              state.pauseOnRemoval ? EnableDisable.ENABLE : EnableDisable.DISABLE,
+            ])
+          );
+          break;
+        }
         replies.push(
           mdr([
             CommandT1.SYSTEM_RET_PARAM,
@@ -216,7 +231,15 @@ function createFakeDevice({
         );
         break;
       case CommandT1.SYSTEM_SET_PARAM:
-        state.stcEnabled = payload[2] === EnableDisable.ENABLE;
+        if (payload[1] === SystemInquiredType.PLAYBACK_CONTROL_BY_WEARING) {
+          state.pauseOnRemoval = payload[2] === EnableDisable.ENABLE;
+        } else {
+          state.stcEnabled = payload[2] === EnableDisable.ENABLE;
+        }
+        break; // ACK only
+
+      case CommandT1.POWER_SET_STATUS:
+        if (payload[1] === PowerInquiredType.POWER_OFF) state.poweredOff = true;
         break; // ACK only
       case CommandT1.SYSTEM_GET_EXT_PARAM:
         replies.push(
@@ -624,6 +647,46 @@ describe("Headphones.connect() over a fake device", () => {
     expect(commands).toContain(CommandT1.SYSTEM_SET_EXT_PARAM);
     expect(commands).not.toContain(CommandT1.SYSTEM_SET_PARAM);
   }, 20_000);
+
+  it("reads and writes pause-on-removal without confusing it for Speak-to-Chat", async () => {
+    // Both ride the same SYSTEM_RET_PARAM command and are told apart only by inquired type.
+    const transport = new LoopbackTransport(createFakeDevice({ extras: true }));
+    const hp = new Headphones(transport);
+    const state = await hp.connect();
+
+    expect(state.pauseOnRemoval).toBe(true);
+    expect(state.speakToChat?.enabled).toBe(false);
+
+    await hp.setPauseOnRemoval(false);
+    expect(hp.state.pauseOnRemoval).toBe(false);
+    // Speak-to-Chat must not have been touched by a message aimed at the other setting.
+    expect(hp.state.speakToChat?.enabled).toBe(false);
+  }, 20_000);
+
+  it("asks the headphones to power off, and stops polling them", async () => {
+    const transport = new LoopbackTransport(createFakeDevice({ extras: true }));
+    const hp = new Headphones(transport);
+    await hp.connect();
+    expect(hp.state.canPowerOff).toBe(true);
+
+    await hp.powerOff();
+
+    const sets = transport.sent
+      .map((f) => decodeFrameBody(f.subarray(1, f.length - 1)))
+      .filter((f) => f.payload[0] === CommandT1.POWER_SET_STATUS);
+    expect(sets.length).toBe(1);
+    expect(sets[0]!.payload[1]).toBe(PowerInquiredType.POWER_OFF);
+    expect(sets[0]!.payload[2]).toBe(PowerOffSettingValue.USER_POWER_OFF);
+  }, 20_000);
+
+  it("refuses to power off headphones that never said they could", async () => {
+    const transport = new LoopbackTransport(createFakeDevice());
+    const hp = new Headphones(transport);
+    await hp.connect();
+
+    expect(hp.state.canPowerOff).toBe(false);
+    await expect(hp.powerOff()).rejects.toThrow(/power-off/i);
+  });
 
   it("reverts an extra setting the headset never accepted", async () => {
     let deaf = false;

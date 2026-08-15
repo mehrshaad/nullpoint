@@ -64,6 +64,7 @@ export enum CommandT1 {
 
   POWER_GET_STATUS = 0x22,
   POWER_RET_STATUS = 0x23,
+  POWER_SET_STATUS = 0x24,
   /** Pushed by the headset when the charge level changes, without being asked. */
   POWER_NTFY_STATUS = 0x25,
 
@@ -102,6 +103,8 @@ export enum AudioInquiredType {
 
 /** ProtocolV2T1.h:5595-5638 (subset). */
 export enum SystemInquiredType {
+  /** "Pause when you take them off" — wear detection driving playback. */
+  PLAYBACK_CONTROL_BY_WEARING = 0x01,
   SMART_TALKING_MODE_TYPE2 = 0x0c,
 }
 
@@ -216,8 +219,10 @@ export enum FunctionTypeT1 {
   MODE_NC_ASM_NOISE_CANCELLING_DUAL_AUTO_AMBIENT_SOUND_MODE_LEVEL_ADJUSTMENT = 0x68,
   MODE_NC_ASM_NOISE_CANCELLING_DUAL_AMBIENT_SOUND_MODE_LEVEL_ADJUSTMENT = 0x6b,
   MODE_NC_ASM_NOISE_CANCELLING_DUAL_AMBIENT_SOUND_MODE_LEVEL_ADJUSTMENT_NOISE_ADAPTATION = 0x6d,
+  POWER_OFF = 0x23,
   CONNECTION_MODE_SOUND_QUALITY_CONNECTION_QUALITY = 0xe1,
   UPSCALING_AUTO_OFF = 0xe2,
+  PLAYBACK_CONTROL_BY_WEARING_REMOVING_HEADPHONE_ON_OFF = 0xf1,
   SMART_TALKING_MODE_TYPE2 = 0xfc,
 }
 
@@ -266,7 +271,16 @@ export enum PowerInquiredType {
   BATTERY = 0x00,
   LEFT_RIGHT_BATTERY = 0x01,
   CRADLE_BATTERY = 0x02,
+  POWER_OFF = 0x03,
   BATTERY_WITH_THRESHOLD = 0x08,
+}
+
+/**
+ * ProtocolV2T1.h:1252-1256. `FACTORY_POWER_OFF = 0xFF` also exists but the message's own
+ * validity check rejects anything but USER_POWER_OFF, so it is left out.
+ */
+export enum PowerOffSettingValue {
+  USER_POWER_OFF = 0x01,
 }
 
 /** ProtocolV2T1.h:998-1004 */

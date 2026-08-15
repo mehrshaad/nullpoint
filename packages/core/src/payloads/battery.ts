@@ -1,7 +1,25 @@
 // Ported from mos9527/SonyHeadphonesClient (MIT) — see /NOTICE.
 // Source: src/ProtocolV2T1.h:895-1227 @ master, src/Headphones.cpp:727-754,1078-1130
 
-import { BatteryChargingStatus, CommandT1, PowerInquiredType } from "../constants.js";
+import {
+  BatteryChargingStatus,
+  CommandT1,
+  PowerInquiredType,
+  PowerOffSettingValue,
+} from "../constants.js";
+
+/**
+ * Ask the headphones to switch themselves off. ProtocolV2T1.h:1269-1286 —
+ * `[POWER_SET_STATUS][POWER_OFF][USER_POWER_OFF]`. The other documented value is a factory
+ * power-off which the firmware itself rejects from this message, so it isn't offered.
+ */
+export function encodePowerOff(): Uint8Array {
+  return Uint8Array.from([
+    CommandT1.POWER_SET_STATUS,
+    PowerInquiredType.POWER_OFF,
+    PowerOffSettingValue.USER_POWER_OFF,
+  ]);
+}
 
 export function encodeGetBattery(type: PowerInquiredType = PowerInquiredType.BATTERY): Uint8Array {
   return Uint8Array.from([CommandT1.POWER_GET_STATUS, type]);

@@ -17,6 +17,7 @@ import {
   PeripheralOutcome,
   PowerInquiredType,
   PriorMode,
+  SystemInquiredType,
   UpscalingTypeAutoOff,
 } from "./constants.js";
 import { FrameReassembler, packageDataForBt, type DecodedFrame } from "./framing.js";
@@ -46,6 +47,10 @@ export interface HeadphonesState {
   connectionMode: PriorMode | null;
   upscaling: UpscalingTypeAutoOff | null;
   speakToChat: System.SpeakToChatState | null;
+  /** "Pause when you take them off." */
+  pauseOnRemoval: boolean | null;
+  /** Whether the headphones accept a power-off command; there is no value to read back. */
+  canPowerOff: boolean;
 }
 
 /**
@@ -63,7 +68,10 @@ export type HeadphonesEvent =
   /** One of the capability-gated extras (connection quality, DSEE, Speak-to-Chat) changed. */
   | { type: "settings" }
   | { type: "deviceInfo" }
-  | { type: "writeFailed"; feature: "ncAsm" | "eq" | "connectionMode" | "upscaling" | "speakToChat" }
+  | {
+      type: "writeFailed";
+      feature: "ncAsm" | "eq" | "connectionMode" | "upscaling" | "speakToChat" | "pauseOnRemoval";
+    }
   /**
    * The link is still open but the headset has stopped accepting commands — in practice
    * because another device (usually a phone on multipoint) has taken the control channel.
@@ -106,6 +114,8 @@ export class Headphones {
     connectionMode: null,
     upscaling: null,
     speakToChat: null,
+    pauseOnRemoval: null,
+    canPowerOff: false,
   };
 
   constructor(private transport: Transport) {
@@ -223,6 +233,34 @@ export class Headphones {
         CommandT1.SYSTEM_RET_EXT_PARAM
       );
     }
+    if (this.supports(FunctionTypeT1.PLAYBACK_CONTROL_BY_WEARING_REMOVING_HEADPHONE_ON_OFF)) {
+      await this.request(
+        DataType.DATA_MDR,
+        System.encodeGetSystemParam(SystemInquiredType.PLAYBACK_CONTROL_BY_WEARING),
+        CommandT1.SYSTEM_RET_PARAM
+      );
+    }
+    // Nothing to read: this one is an action, not a value.
+    this.state.canPowerOff = this.supports(FunctionTypeT1.POWER_OFF);
+  }
+
+  /** "Pause when you take them off." */
+  async setPauseOnRemoval(enabled: boolean): Promise<void> {
+    await this.writeSetting("pauseOnRemoval", enabled, () =>
+      System.encodeSetSystemParam(SystemInquiredType.PLAYBACK_CONTROL_BY_WEARING, enabled)
+    );
+  }
+
+  /**
+   * Switch the headphones off. They drop the link on the way down, so the transport reporting a
+   * disconnection immediately afterwards is the expected outcome, not a failure.
+   */
+  async powerOff(): Promise<void> {
+    if (!this.state.canPowerOff) {
+      throw new Error("These headphones don't accept a power-off command.");
+    }
+    this.stopBatteryRefresh();
+    await this.send(DataType.DATA_MDR, Battery.encodePowerOff());
   }
 
   /** Sound quality vs. a stable link — on LDAC devices this is the 990kbps tradeoff. */
@@ -272,7 +310,7 @@ export class Headphones {
    * Paint the new value, write it, and put the old one back if the headset never took it —
    * the same contract every other control in the app follows.
    */
-  private async writeSetting<K extends "connectionMode" | "upscaling">(
+  private async writeSetting<K extends "connectionMode" | "upscaling" | "pauseOnRemoval">(
     key: K,
     value: NonNullable<HeadphonesState[K]>,
     encode: () => Uint8Array
@@ -727,6 +765,15 @@ export class Headphones {
       }
       case CommandT1.SYSTEM_RET_PARAM:
       case CommandT1.SYSTEM_NTFY_PARAM: {
+        const wearing = System.decodeSystemParam(
+          frame.payload,
+          SystemInquiredType.PLAYBACK_CONTROL_BY_WEARING
+        );
+        if (wearing !== null) {
+          this.state.pauseOnRemoval = wearing;
+          this.emit({ type: "settings" });
+          break;
+        }
         const enabled = System.decodeSpeakToChatEnabled(frame.payload);
         if (enabled === null) break;
         // The detail settings arrive in their own message, so keep whatever we already know.

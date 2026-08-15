@@ -27,6 +27,28 @@ export interface SpeakToChatState {
 
 const TYPE = SystemInquiredType.SMART_TALKING_MODE_TYPE2;
 
+/**
+ * `SystemParamCommon` — the plain on/off shape shared by several system settings,
+ * `[command][inquiredType][value]`. ProtocolV2T1.h:6049-6075.
+ */
+export function encodeGetSystemParam(type: SystemInquiredType): Uint8Array {
+  return Uint8Array.from([CommandT1.SYSTEM_GET_PARAM, type]);
+}
+
+export function encodeSetSystemParam(type: SystemInquiredType, enabled: boolean): Uint8Array {
+  return Uint8Array.from([
+    CommandT1.SYSTEM_SET_PARAM,
+    type,
+    enabled ? EnableDisable.ENABLE : EnableDisable.DISABLE,
+  ]);
+}
+
+/** Null when the frame is about a different system setting. */
+export function decodeSystemParam(payload: Uint8Array, type: SystemInquiredType): boolean | null {
+  if (payload[1] !== type || payload[2] === undefined) return null;
+  return payload[2] === EnableDisable.ENABLE;
+}
+
 export function encodeGetSpeakToChat(): Uint8Array {
   return Uint8Array.from([CommandT1.SYSTEM_GET_PARAM, TYPE]);
 }
