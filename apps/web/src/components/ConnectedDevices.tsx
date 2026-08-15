@@ -37,6 +37,15 @@ function Audio() {
   );
 }
 
+function Tablet() {
+  return (
+    <>
+      <rect x="2.5" y="2.5" width="17" height="17" rx="2.5" />
+      <path d="M9 17h4" />
+    </>
+  );
+}
+
 function Wearable() {
   return (
     <>
@@ -46,17 +55,19 @@ function Wearable() {
   );
 }
 
+/** A device we can identify neither by its reported class nor by its name. */
 function Other() {
   return (
     <>
-      <circle cx="11" cy="11" r="8.5" />
-      <path d="M11 7v4l2.5 2.5" />
+      <rect x="3" y="3" width="16" height="16" rx="4" />
+      <circle cx="11" cy="11" r="1.4" />
     </>
   );
 }
 
 const ICONS: Record<PairedDeviceKind, () => ReactElement> = {
   phone: Phone,
+  tablet: Tablet,
   computer: Computer,
   audio: Audio,
   wearable: Wearable,

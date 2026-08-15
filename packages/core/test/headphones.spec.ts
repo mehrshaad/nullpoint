@@ -786,6 +786,61 @@ describe("Headphones.connect() over a fake device", () => {
     expect(phone).toMatchObject({ name: "Mehrshad's iPhone", connected: false, hasPlaybackRight: false });
   });
 
+  it("guesses a device type from its name when the class of device is unknown", async () => {
+    // Paired-but-disconnected devices report 0xFFFFFF, so every one of them would otherwise
+    // show the same generic icon. These are the real names from a WH-1000XM6.
+    const transport = new LoopbackTransport(createFakeDevice({ table2: true }));
+    const hp = new Headphones(transport);
+    await hp.connect();
+
+    const named = (name: string) => pairedDeviceRecord("AA:BB:CC:DD:EE:09", 0, 0xffffff, name);
+    const kindOf = (name: string) => {
+      transport.emit(
+        packageDataForBt(
+          DataType.DATA_MDR_NO2,
+          0,
+          Uint8Array.from([
+            CommandT2.PERI_NTFY_PARAM,
+            PeripheralInquiredType.PAIRING_DEVICE_MANAGEMENT_WITH_BLUETOOTH_CLASS_OF_DEVICE,
+            1,
+            ...named(name),
+            0,
+          ])
+        )
+      );
+      return hp.state.pairedDevices![0]!.kind;
+    };
+
+    expect(kindOf("Mehrshad's iPhone")).toBe("phone");
+    expect(kindOf("Sara's MacBook Air")).toBe("computer");
+    expect(kindOf("Mehrshad's Apple Watch")).toBe("wearable");
+    expect(kindOf("iPad Pro")).toBe("tablet");
+    // A hostname that tells us nothing stays generic rather than being forced into a guess.
+    expect(kindOf("H191KXL4DY")).toBe("other");
+  });
+
+  it("prefers the reported class of device over the name", async () => {
+    const transport = new LoopbackTransport(createFakeDevice({ table2: true }));
+    const hp = new Headphones(transport);
+    await hp.connect();
+
+    transport.emit(
+      packageDataForBt(
+        DataType.DATA_MDR_NO2,
+        0,
+        Uint8Array.from([
+          CommandT2.PERI_NTFY_PARAM,
+          PeripheralInquiredType.PAIRING_DEVICE_MANAGEMENT_WITH_BLUETOOTH_CLASS_OF_DEVICE,
+          1,
+          // Called a "phone", but the headset says it is a computer. Believe the headset.
+          ...pairedDeviceRecord(THINKPAD, 1, 0x2e410c, "Work phone"),
+          1,
+        ])
+      )
+    );
+    expect(hp.state.pairedDevices![0]!.kind).toBe("computer");
+  });
+
   it("counts a device in the second multipoint slot as connected", async () => {
     const transport = new LoopbackTransport(createFakeDevice({ table2: true }));
     const hp = new Headphones(transport);

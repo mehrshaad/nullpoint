@@ -14,7 +14,7 @@ const ADDRESS_LENGTH = 17;
  * What kind of thing a paired device is, derived from its Bluetooth Class of Device. Used to
  * show a meaningful icon per row rather than an identical dot for everything.
  */
-export type PairedDeviceKind = "phone" | "computer" | "audio" | "wearable" | "other";
+export type PairedDeviceKind = "phone" | "tablet" | "computer" | "audio" | "wearable" | "other";
 
 export interface PairedDevice {
   /** "XX:XX:XX:XX:XX:XX" as reported by the headset. */
@@ -49,6 +49,37 @@ function kindFromClassOfDevice(cod: number): PairedDeviceKind {
     default:
       return "other";
   }
+}
+
+/**
+ * Devices that are paired but not currently connected report their class as
+ * `0xFFFFFF` — unknown — so the only thing left to go on is the name the owner gave them.
+ * Most are recognisable ("Mehrshad's iPhone", "Sara's MacBook Air"), and a familiar icon on the
+ * right row is worth more than a row of identical unknowns. Anything unrecognised stays
+ * generic rather than being forced into a guess.
+ */
+const NAME_HINTS: Array<[RegExp, PairedDeviceKind]> = [
+  [/\b(ipad|galaxy tab|tablet)\b/i, "tablet"],
+  [/\b(iphone|galaxy|pixel|oneplus|xiaomi|redmi|huawei|honor|oppo|vivo|nokia|moto|phone)\b/i, "phone"],
+  [
+    /\b(macbook|imac|mac ?(mini|studio|pro)|thinkpad|ideapad|legion|loq|latitude|inspiron|xps|surface|elitebook|probook|zenbook|vivobook|omen|rog|laptop|desktop|pc)\b/i,
+    "computer",
+  ],
+  [/\b(watch|band|fit(bit)?|tracker)\b/i, "wearable"],
+  [/\b(airpods|buds|headphones?|earbuds|speaker|soundbar|tv|echo|homepod|sonos)\b/i, "audio"],
+];
+
+function kindFromName(name: string): PairedDeviceKind {
+  for (const [pattern, kind] of NAME_HINTS) {
+    if (pattern.test(name)) return kind;
+  }
+  return "other";
+}
+
+/** The reported class where there is one, the name as a fallback where there isn't. */
+function kindFor(cod: number, name: string): PairedDeviceKind {
+  const reported = kindFromClassOfDevice(cod);
+  return reported === "other" ? kindFromName(name) : reported;
 }
 
 export function encodeGetPairedDevices(): Uint8Array {
@@ -93,12 +124,13 @@ export function decodePairedDevices(payload: Uint8Array): PairedDevice[] {
 
       if (offset > payload.length) throw new Error("device record runs past the end of the payload");
 
+      const label = name || address;
       devices.push({
         address,
-        name: name || address,
+        name: label,
         connected: slot > 0,
         slot,
-        kind: kindFromClassOfDevice(cod),
+        kind: kindFor(cod, label),
         hasPlaybackRight: false,
       });
     }
