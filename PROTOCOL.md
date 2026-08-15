@@ -106,8 +106,17 @@ A headset advertising the first uses it even if it also advertises the second. T
 fields are **auto ambient level** and its sensitivity (`STANDARD 0`, `HIGH 1`, `LOW 2`) — without
 the 0x19 form that control cannot be written at all.
 
-Reads should key off the inquired type in the received frame rather than off what you think the
-device supports; the frame describes itself.
+**verified** A WH-1000XM6 on FW 3.1.5 advertises `0x6D` and **not** `0x6B`, and answers in the
+9-byte form.
+
+Treat the bitmap as an opening guess only: **key both reads and subsequent writes off the
+inquired type in the frame the device actually sent**. The frame describes itself, which is
+evidence; the bitmap is inference. Getting this wrong writes a message two bytes short, so auto
+ambient appears to work and silently changes nothing.
+
+Note for anyone testing this: auto ambient is meaningful only in ambient mode, and Sony's UI
+disables it under noise cancelling. A scripted click can bypass a disabled control and produce a
+convincing false bug report.
 
 ## Capability-gated settings
 
@@ -115,7 +124,7 @@ Each is asked for only if `CONNECT_RET_SUPPORT_FUNCTION` lists its function type
 
 | Setting | Function type | Messages |
 |---|---|---|
-| Connection quality | 0xE1 | `AUDIO_*_PARAM (0xE6/E7/E8/E9)`, inquired type `CONNECTION_MODE 0x00`, value `PriorMode` (`SOUND_QUALITY 0`, `CONNECTION_QUALITY 1`, `LOW_LATENCY_BETA 2`) |
+| Connection quality | 0xE1 | `AUDIO_*_PARAM (0xE6/E7/E8/E9)`, inquired type `CONNECTION_MODE 0x00`, value `PriorMode` (`SOUND_QUALITY 0`, `CONNECTION_QUALITY 1`, `LOW_LATENCY_BETA 2`). **verified** A WH-1000XM6 does *not* advertise this; it advertises `0xE7` (classic/LE audio) instead, so the control is correctly absent there |
 | DSEE Extreme | 0xE2 | the same family, inquired type `UPSCALING 0x01`, value `OFF 0` / `AUTO 1` |
 | Speak-to-Chat | 0xFC | **two** messages, see below |
 | Pause on removal | 0xF1 | `SYSTEM_*_PARAM`, inquired type `PLAYBACK_CONTROL_BY_WEARING 0x01`, value `EnableDisable` |
@@ -162,13 +171,27 @@ anything else, so there is never a reason to guess.
 | Field | Notes |
 |---|---|
 | `btDeviceAddress` | 17 ASCII bytes, `XX:XX:XX:XX:XX:XX`, no terminator |
-| `connectedStatus` | 1 byte |
-| `bluetoothClassOfDevice` | 24-bit big-endian. Major device class is bits 8–12: `0x01` computer, `0x02` phone, `0x04` audio/video, `0x07` wearable |
-| `btFriendlyName` | length-prefixed; **may legitimately be empty**, even though Sony's own app requires at least one character ([mos9527#21](https://github.com/mos9527/SonyHeadphonesClient/issues/21)) |
+| `connectedStatus` | **verified** Not a flag — the **multipoint slot** this device occupies. `0` means not connected, otherwise `1` or `2`. Testing it for equality with 1 reports the second multipoint device as disconnected |
+| `bluetoothClassOfDevice` | 24-bit big-endian. Major device class is bits 8–12: `0x01` computer, `0x02` phone, `0x04` audio/video, `0x07` wearable. **verified** Devices that are merely paired report `0xFFFFFF` (unknown) — only currently connected ones report a real class |
+| `btFriendlyName` | length-prefixed UTF-8; **may legitimately be empty**, even though Sony's own app requires at least one character ([mos9527#21](https://github.com/mos9527/SonyHeadphonesClient/issues/21)) |
 
-The trailing byte is an *index into the list*, not an address — the device currently holding
-the playback right. Inquired type `0x00` returns the same shape **without** the class-of-device
-field; don't parse one with the other's layout.
+The trailing byte is the **slot** holding the playback right, matching `connectedStatus` above —
+not a position in the list. Upstream indexes a map keyed by slot (Headphones.cpp:1365-1369).
+**verified** Reading it as a list index puts the "has the audio" marker on whichever device
+happens to sit at that position, in practice one that is not even connected.
+
+Inquired type `0x00` returns the same shape **without** the class-of-device field; don't parse
+one with the other's layout.
+
+A real capture from a WH-1000XM6, trimmed to two devices:
+
+```
+37 02 05                                            PERI_RET_PARAM, CoD variant, 5 devices
+44 30 3a 33 39 …  01  2e 41 0c  0c "MEHRSHAD-LOQ"   slot 1, CoD 2E410C (computer)
+42 34 3a 39 36 …  00  ff ff ff  13 "…’s iPhone"     paired only, class unknown
+…
+01                                                  slot 1 holds the playback right
+```
 
 The headset pushes `PERI_NTFY_PARAM (0x39)` with the whole list again whenever a device
 connects or disconnects, so this never needs polling.

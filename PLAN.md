@@ -34,7 +34,7 @@ Shipped as a result:
 - All commands are serialised, since the link carries one request/response at a time and
   overlapping commands were orphaning each other's acknowledgement.
 
-## Phase 1 — Connected devices (Table 2) — built, unverified on hardware
+## Phase 1 — Connected devices (Table 2) ✅ working on hardware
 
 **Table 2 (`DATA_MDR_NO2`) is implemented**, and with it the "CONNECTED TO" panel: every device
 the headphones are paired with, which are connected, which holds the playback right, an icon per
@@ -51,10 +51,9 @@ every connection.
 
 **Still open:**
 
-- **Nobody has seen this against real hardware yet.** It is unknown whether a WH-1000XM6 on
-  FW 3.1.5 reports Table 2 support at all; if it doesn't, the panel correctly never appears, and
-  the work needed is to find out rather than to write more code. This is exactly the trap
-  standing rule 2 describes.
+- Connect and disconnect from the panel are written but not yet exercised on hardware.
+- Merely-paired devices report an unknown Bluetooth class (`0xFFFFFF`), so only connected ones
+  get a device-specific icon; the rest fall back to the generic one.
 - Pairing mode (put the headset into pairing) is not implemented.
 - Unpair is deliberately left out: irreversible from the app, and nothing needs it.
 
@@ -89,7 +88,7 @@ control the hardware doesn't have rather than showing it disabled.
 | ✅ **Auto ambient level** | Was shown disabled since v1. Needed the `…NOISE_ADAPTATION` NC/ASM variant, plus LOW/STANDARD/HIGH sensitivity |
 | ✅ **Speak-to-Chat** | On/off, voice sensitivity, and how long before your music resumes |
 | ✅ **DSEE Extreme** | Upscaling auto/off |
-| ✅ **Connection quality** | Sound quality vs. stable link vs. low latency — a real daily tradeoff |
+| ✅ **Connection quality** | Sound quality vs. stable link vs. low latency. Not offered by the XM6, which doesn't advertise `0xE1` |
 | ✅ **Pause on removal** | Wear detection driving playback |
 | ✅ **Power off** | A button in Settings, beside the capability report |
 
@@ -140,31 +139,32 @@ Drive the whole UI from the capability bitmap rather than assuming a WH-1000XM6:
 
 ---
 
-## Next hardware session
+## What the hardware said
 
-Everything below is built, tested against the fake device, and has never met a real headset.
-Working through this in one sitting settles all of it. **Open Settings first** — the capability
-report answers most of these questions before you touch a control.
+Everything added after v0.3.0 has now met a real WH-1000XM6 on FW 3.1.5. It reports **45**
+capabilities, and Table 2 works — the device list comes back complete, names intact through
+UTF-8 curly apostrophes.
 
-1. **What did the headset report?** Settings → "What your headphones report". Whether the
-   WH-1000XM6 lists noise adaptation (0x6D) rather than plain noise control (0x6B) decides
-   whether auto ambient level can exist at all. Note the "reported but not used" codes.
-2. **Did a device list appear?** The CONNECTED TO panel only exists if Table 2 answered. If it
-   is missing, that is the finding — the panel is behaving correctly.
-3. **Connect and disconnect a device from that panel.** Disconnecting the phone should show it
-   as PAIRED within a moment. Disconnecting *this computer* drops the link on purpose; the
-   reconnect loop should pick it back up.
-4. **Auto ambient level, and its LOW/STANDARD/HIGH.** Then change the noise mode and check auto
-   ambient did not switch itself off — every NC/ASM write sends the whole message.
-5. **Speak-to-Chat the right way round.** `ENABLE` is 0 on the wire, so an inverted result here
-   is the specific bug to watch for: turning it on in the app should turn it on in reality, not
-   off.
-6. **Connection quality, DSEE, pause-on-removal, power off.**
-7. **The old flicker.** Change a mode repeatedly and while the phone is playing. Commands are
-   serialised now; the change-then-revert-then-settle behaviour should be gone.
+Confirmed working: the paired-device list, auto ambient level and its sensitivity, Speak-to-Chat,
+DSEE Extreme, pause on removal, battery, the 10-band equalizer.
 
-Anything that misbehaves is worth capturing with the capability report alongside it — that is
-the context that makes a protocol bug diagnosable.
+Two things behaved correctly and only looked broken:
+
+- **Connection quality is absent** because the XM6 does not advertise `0xE1` at all. It
+  advertises `0xE7` (classic/LE audio) instead. The row is right to be missing.
+- **Auto ambient appeared dead** when driven by a script that clicked it while the headphones
+  were in noise-cancelling mode, where the UI deliberately disables it. A programmatic click
+  bypasses a disabled control; a human could not have hit it.
+
+One real bug, found only by reading raw frames rather than the rendered page: `connectedStatus`
+is a **multipoint slot**, not a flag, and the trailing byte of the device list is a slot rather
+than a list index — so the "has the audio" marker sat on a phone that was not even connected,
+and a device in slot 2 read as disconnected. Details in [`PROTOCOL.md`](./PROTOCOL.md).
+
+**The lesson worth keeping:** two of the three "bugs" first reported from this session were
+misreadings of the app's own UI text. The bytes settled all three. Read the frames.
+
+Still unverified: connect/disconnect from the device panel, and power off.
 
 ## Standing engineering rules
 
