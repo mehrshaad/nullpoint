@@ -26,6 +26,8 @@ const TRACKED: Array<{ fn: FunctionTypeT1; label: string }> = [
   { fn: FunctionTypeT1.CONNECTION_MODE_SOUND_QUALITY_CONNECTION_QUALITY, label: "Connection quality" },
   { fn: FunctionTypeT1.UPSCALING_AUTO_OFF, label: "DSEE Extreme" },
   { fn: FunctionTypeT1.SMART_TALKING_MODE_TYPE2, label: "Speak-to-Chat" },
+  { fn: FunctionTypeT1.PLAYBACK_CONTROL_BY_WEARING_REMOVING_HEADPHONE_ON_OFF, label: "Pause when removed" },
+  { fn: FunctionTypeT1.POWER_OFF, label: "Power off" },
 ];
 
 function hex(value: number): string {
