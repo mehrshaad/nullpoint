@@ -93,6 +93,45 @@ exception there tears down the whole connection.
 **verified** `Custom` is not a stored curve on the headset; it *is* whatever band values you
 send. Selecting it with an empty band list is silently ignored — send the band values with it.
 
+## NC/ASM has two shapes
+
+Which one to write is decided from the capability bitmap, in this order (Headphones.cpp:184-195):
+
+| Capability | Inquired type | Payload |
+|---|---|---|
+| `…LEVEL_ADJUSTMENT` (0x6B) | 0x17 | 7 bytes: `[cmd][type][changeStatus][totalEffect][mode][ambientMode][level]` |
+| `…LEVEL_ADJUSTMENT_NOISE_ADAPTATION` (0x6D) | 0x19 | the same, plus `[noiseAdaptiveOnOff][sensitivity]` |
+
+A headset advertising the first uses it even if it also advertises the second. The trailing two
+fields are **auto ambient level** and its sensitivity (`STANDARD 0`, `HIGH 1`, `LOW 2`) — without
+the 0x19 form that control cannot be written at all.
+
+Reads should key off the inquired type in the received frame rather than off what you think the
+device supports; the frame describes itself.
+
+## Capability-gated settings
+
+Each is asked for only if `CONNECT_RET_SUPPORT_FUNCTION` lists its function type.
+
+| Setting | Function type | Messages |
+|---|---|---|
+| Connection quality | 0xE1 | `AUDIO_*_PARAM (0xE6/E7/E8/E9)`, inquired type `CONNECTION_MODE 0x00`, value `PriorMode` (`SOUND_QUALITY 0`, `CONNECTION_QUALITY 1`, `LOW_LATENCY_BETA 2`) |
+| DSEE Extreme | 0xE2 | the same family, inquired type `UPSCALING 0x01`, value `OFF 0` / `AUTO 1` |
+| Speak-to-Chat | 0xFC | **two** messages, see below |
+
+All the AUDIO param messages share one shape: `[command][inquiredType][value]`.
+
+Speak-to-Chat is split. Whether it's on lives in `SYSTEM_*_PARAM (0xF6/F7/F8/F9)` as
+`[command][type 0x0C][onOff][previewMode]`; sensitivity and resume delay live in
+`SYSTEM_*_EXT_PARAM (0xFA/FB/FC/FD)` as `[command][type 0x0C][detectSensitivity][modeOffTime]`.
+Write only the one that changed. Sensitivity is `AUTO 0`, `HIGH 1`, `LOW 2`; resume delay is
+`FAST 0`, `MID 1`, `SLOW 2`, `NONE 3` (never resumes on its own). Preview mode is a demo mode
+Sony's own app uses; send it off.
+
+> **`EnableDisable` is inverted.** `ENABLE = 0`, `DISABLE = 1` (Constants.h:82-88) — the
+> opposite of the `OnOff` enum used elsewhere in the same protocol. Assuming the usual mapping
+> silently inverts every setting that uses it.
+
 ## Preset IDs
 
 `OFF 0x00`, `HEAVY 0x30`, `CLEAR 0x31`, `HARD 0x32`, `SOFT 0x33`, `CUSTOM 0xA0`,

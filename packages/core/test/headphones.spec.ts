@@ -7,6 +7,14 @@ import {
   CommandT2,
   ConnectInquiredType,
   ConnectivityActionType,
+  AudioInquiredType,
+  SystemInquiredType,
+  EnableDisable,
+  FunctionTypeT1,
+  PriorMode,
+  UpscalingTypeAutoOff,
+  DetectSensitivity,
+  ModeOutTime,
   DataType,
   DeviceInfoType,
   PeripheralInquiredType,
@@ -59,7 +67,8 @@ const THINKPAD = "AA:BB:CC:DD:EE:02";
 function createFakeDevice({
   table2 = false,
   noiseAdaptation = false,
-}: { table2?: boolean; noiseAdaptation?: boolean } = {}) {
+  extras = false,
+}: { table2?: boolean; noiseAdaptation?: boolean; extras?: boolean } = {}) {
   const ncAsmType = noiseAdaptation
     ? NcAsmInquiredType.MODE_NC_ASM_DUAL_NC_MODE_SWITCH_AND_ASM_SEAMLESS_NA
     : NcAsmInquiredType.MODE_NC_ASM_DUAL_NC_MODE_SWITCH_AND_ASM_SEAMLESS;
@@ -72,6 +81,11 @@ function createFakeDevice({
       autoOn: OnOff.OFF as number,
       sensitivity: NoiseAdaptiveSensitivity.STANDARD as number,
     },
+    connectionMode: PriorMode.SOUND_QUALITY as number,
+    upscaling: UpscalingTypeAutoOff.OFF as number,
+    stcEnabled: false,
+    stcSensitivity: DetectSensitivity.AUTO as number,
+    stcTimeout: ModeOutTime.MID as number,
     eqPreset: EqPresetId.CUSTOM as number,
     eqSteps: [13, 12, 10, 8, 13, 15],
     // Which paired devices are currently connected. Mutated by connect/disconnect so the
@@ -151,20 +165,73 @@ function createFakeDevice({
         replies.push(mdr([CommandT1.CONNECT_RET_DEVICE_INFO, type, bytes.length, ...bytes]));
         break;
       }
-      case CommandT1.CONNECT_GET_SUPPORT_FUNCTION:
+      case CommandT1.CONNECT_GET_SUPPORT_FUNCTION: {
+        const functions = [
+          FunctionTypeT1.BATTERY_LEVEL_INDICATOR,
+          // 0x6b is the plain level-adjustment function, 0x6d the noise-adaptation one.
+          noiseAdaptation ? 0x6d : 0x6b,
+          ...(extras
+            ? [
+                FunctionTypeT1.CONNECTION_MODE_SOUND_QUALITY_CONNECTION_QUALITY,
+                FunctionTypeT1.UPSCALING_AUTO_OFF,
+                FunctionTypeT1.SMART_TALKING_MODE_TYPE2,
+              ]
+            : []),
+        ];
         replies.push(
           mdr([
             CommandT1.CONNECT_RET_SUPPORT_FUNCTION,
             ConnectInquiredType.FIXED_VALUE,
-            2,
-            0x20,
-            0,
-            // 0x6b is the plain level-adjustment function, 0x6d the noise-adaptation one.
-            noiseAdaptation ? 0x6d : 0x6b,
-            0,
+            functions.length,
+            // Each entry is a (functionType, priority) pair.
+            ...functions.flatMap((fn) => [fn, 0]),
           ])
         );
         break;
+      }
+
+      case CommandT1.AUDIO_GET_PARAM:
+        replies.push(
+          mdr([
+            CommandT1.AUDIO_RET_PARAM,
+            payload[1]!,
+            payload[1] === AudioInquiredType.CONNECTION_MODE ? state.connectionMode : state.upscaling,
+          ])
+        );
+        break;
+      case CommandT1.AUDIO_SET_PARAM:
+        if (payload[1] === AudioInquiredType.CONNECTION_MODE) state.connectionMode = payload[2]!;
+        else state.upscaling = payload[2]!;
+        break; // ACK only
+
+      case CommandT1.SYSTEM_GET_PARAM:
+        replies.push(
+          mdr([
+            CommandT1.SYSTEM_RET_PARAM,
+            SystemInquiredType.SMART_TALKING_MODE_TYPE2,
+            // Inverted on the wire: ENABLE is 0.
+            state.stcEnabled ? EnableDisable.ENABLE : EnableDisable.DISABLE,
+            EnableDisable.DISABLE,
+          ])
+        );
+        break;
+      case CommandT1.SYSTEM_SET_PARAM:
+        state.stcEnabled = payload[2] === EnableDisable.ENABLE;
+        break; // ACK only
+      case CommandT1.SYSTEM_GET_EXT_PARAM:
+        replies.push(
+          mdr([
+            CommandT1.SYSTEM_RET_EXT_PARAM,
+            SystemInquiredType.SMART_TALKING_MODE_TYPE2,
+            state.stcSensitivity,
+            state.stcTimeout,
+          ])
+        );
+        break;
+      case CommandT1.SYSTEM_SET_EXT_PARAM:
+        state.stcSensitivity = payload[2]!;
+        state.stcTimeout = payload[3]!;
+        break; // ACK only
       case CommandT1.POWER_GET_STATUS:
         replies.push(mdr([CommandT1.POWER_RET_STATUS, PowerInquiredType.BATTERY, 78, BatteryChargingStatus.NOT_CHARGING]));
         break;
@@ -471,6 +538,107 @@ describe("Headphones.connect() over a fake device", () => {
 
     await expect(hp.setAutoAmbient(true)).rejects.toThrow(/don't support/i);
   });
+
+  it("leaves capability-gated extras null when the headset doesn't claim them", async () => {
+    const transport = new LoopbackTransport(createFakeDevice());
+    const hp = new Headphones(transport);
+    const state = await hp.connect();
+
+    expect(state.connectionMode).toBeNull();
+    expect(state.upscaling).toBeNull();
+    expect(state.speakToChat).toBeNull();
+    // And we must not have asked about features the headset never claimed.
+    const asked = transport.sent
+      .map((f) => decodeFrameBody(f.subarray(1, f.length - 1)))
+      .filter((f) =>
+        [CommandT1.AUDIO_GET_PARAM, CommandT1.SYSTEM_GET_PARAM, CommandT1.SYSTEM_GET_EXT_PARAM].includes(
+          f.payload[0] as CommandT1
+        )
+      );
+    expect(asked).toEqual([]);
+  });
+
+  it("reads connection quality, DSEE and Speak-to-Chat when they're supported", async () => {
+    const transport = new LoopbackTransport(createFakeDevice({ extras: true }));
+    const hp = new Headphones(transport);
+    const state = await hp.connect();
+
+    expect(state.connectionMode).toBe(PriorMode.SOUND_QUALITY);
+    expect(state.upscaling).toBe(UpscalingTypeAutoOff.OFF);
+    expect(state.speakToChat).toEqual({
+      enabled: false,
+      sensitivity: DetectSensitivity.AUTO,
+      timeout: ModeOutTime.MID,
+    });
+  });
+
+  it("switches connection quality and DSEE", async () => {
+    const transport = new LoopbackTransport(createFakeDevice({ extras: true }));
+    const hp = new Headphones(transport);
+    await hp.connect();
+
+    await hp.setConnectionMode(PriorMode.CONNECTION_QUALITY);
+    await hp.setUpscaling(UpscalingTypeAutoOff.AUTO);
+
+    expect(hp.state.connectionMode).toBe(PriorMode.CONNECTION_QUALITY);
+    expect(hp.state.upscaling).toBe(UpscalingTypeAutoOff.AUTO);
+  }, 20_000);
+
+  it("writes Speak-to-Chat on the wire the right way round", async () => {
+    // EnableDisable is inverted — ENABLE is 0 — so an "on" write must put 0 on the wire.
+    const transport = new LoopbackTransport(createFakeDevice({ extras: true }));
+    const hp = new Headphones(transport);
+    await hp.connect();
+
+    await hp.setSpeakToChat({
+      enabled: true,
+      sensitivity: DetectSensitivity.HIGH,
+      timeout: ModeOutTime.SLOW,
+    });
+
+    const sets = transport.sent
+      .map((f) => decodeFrameBody(f.subarray(1, f.length - 1)))
+      .filter((f) => f.payload[0] === CommandT1.SYSTEM_SET_PARAM);
+    expect(sets[sets.length - 1]!.payload[2]).toBe(EnableDisable.ENABLE);
+    expect(hp.state.speakToChat).toEqual({
+      enabled: true,
+      sensitivity: DetectSensitivity.HIGH,
+      timeout: ModeOutTime.SLOW,
+    });
+  }, 20_000);
+
+  it("only writes the Speak-to-Chat message whose settings actually changed", async () => {
+    const transport = new LoopbackTransport(createFakeDevice({ extras: true }));
+    const hp = new Headphones(transport);
+    await hp.connect();
+
+    await hp.setSpeakToChat({
+      enabled: false, // unchanged
+      sensitivity: DetectSensitivity.LOW,
+      timeout: ModeOutTime.MID,
+    });
+
+    const commands = transport.sent
+      .map((f) => decodeFrameBody(f.subarray(1, f.length - 1)))
+      .map((f) => f.payload[0]);
+    expect(commands).toContain(CommandT1.SYSTEM_SET_EXT_PARAM);
+    expect(commands).not.toContain(CommandT1.SYSTEM_SET_PARAM);
+  }, 20_000);
+
+  it("reverts an extra setting the headset never accepted", async () => {
+    let deaf = false;
+    const device = createFakeDevice({ extras: true });
+    const transport = new LoopbackTransport((sent) => (deaf ? [] : device(sent)));
+    const hp = new Headphones(transport);
+    await hp.connect();
+    expect(hp.state.upscaling).toBe(UpscalingTypeAutoOff.OFF);
+
+    deaf = true;
+    await hp.setUpscaling(UpscalingTypeAutoOff.AUTO);
+
+    expect(hp.state.upscaling).toBe(UpscalingTypeAutoOff.OFF);
+    expect(hp.controllable).toBe(false);
+  }, 20_000);
 
   it("reads the paired device list, with a kind per Bluetooth Class of Device", async () => {
     const transport = new LoopbackTransport(createFakeDevice({ table2: true }));

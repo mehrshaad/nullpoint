@@ -142,16 +142,20 @@ export function ConnectedDevices({
             const busy = pending === device.address;
             return (
               <div key={device.address} style={{ padding: "9px 2px" }}>
+              {/* Wraps rather than forcing the panel wide: a row carries a name, an address, up
+                  to two badges and a button, which together do not fit a narrow window. Without
+                  this the whole dashboard grid inherits the row's min-content width. */}
               <div
                 style={{
                   display: "flex",
                   alignItems: "center",
                   gap: 11,
                   minWidth: 0,
+                  flexWrap: "wrap",
                 }}
               >
                 <DeviceIcon kind={device.kind} color={color} />
-                <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ minWidth: 0, flex: "1 1 130px" }}>
                   <div
                     style={{
                       fontWeight: 500,
@@ -164,7 +168,17 @@ export function ConnectedDevices({
                   >
                     {device.name}
                   </div>
-                  <div className="mono" style={{ marginTop: 3, fontSize: 10.5, color: "var(--fg3)" }}>
+                  <div
+                    className="mono"
+                    style={{
+                      marginTop: 3,
+                      fontSize: 10.5,
+                      color: "var(--fg3)",
+                      // A MAC address is one unbreakable token; let it break rather than set
+                      // the floor for how narrow the panel can be.
+                      overflowWrap: "anywhere",
+                    }}
+                  >
                     {device.address}
                   </div>
                 </div>

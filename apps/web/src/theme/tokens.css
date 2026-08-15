@@ -89,6 +89,12 @@ button {
   display: grid;
   grid-template-columns: 1fr 1fr;
 }
+/* Grid items default to min-width:auto, so one panel with wide unbreakable content stretches
+   its whole track and pushes the page into horizontal scroll — which reads as every panel
+   being clipped, not as the one panel being too wide. Let tracks shrink instead. */
+.dashboard-grid > * {
+  min-width: 0;
+}
 @media (max-width: 760px) {
   .dashboard-grid {
     grid-template-columns: 1fr;

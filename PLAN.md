@@ -77,20 +77,25 @@ The things Sony will never build, and the main reason to run this on a computer 
 
 ---
 
-## Phase 3 — Protocol breadth
+## Phase 3 — Protocol breadth — in progress
 
-All of these are supported by the WH-1000XM6 and already described by the ported protocol. Gate
-each on the capability bitmap so other models degrade cleanly.
+Gate every one of these on the capability bitmap so other models degrade cleanly, and omit a
+control the hardware doesn't have rather than showing it disabled.
 
-Highest value first:
+**Done** (all unverified on hardware — see the note at the end):
+
+| Feature | Notes |
+|---|---|
+| ✅ **Auto ambient level** | Was shown disabled since v1. Needed the `…NOISE_ADAPTATION` NC/ASM variant, plus LOW/STANDARD/HIGH sensitivity |
+| ✅ **Speak-to-Chat** | On/off, voice sensitivity, and how long before your music resumes |
+| ✅ **DSEE Extreme** | Upscaling auto/off |
+| ✅ **Connection quality** | Sound quality vs. stable link vs. low latency — a real daily tradeoff |
+
+**Remaining**, highest value first:
 
 | Feature | Notes |
 |---|---|
 | **Adaptive Sound Control** | Auto-switches ANC/ambient by activity (still, walking, transport). Arguably the XM6's headline feature and entirely missing today |
-| **Auto ambient level** | The one control currently shown disabled. Needs the `MODE_NC_ASM_…_NOISE_ADAPTATION` variant plus its sensitivity setting |
-| **Speak-to-Chat** | On/off, sensitivity, and auto-resume timing |
-| **DSEE Extreme** | Upscaling on/off/auto |
-| **Connection quality** | LDAC 990 kbps vs. stable connection — a real daily tradeoff |
 | **Touch sensor** | Enable/disable, and remap what each side does |
 | **Voice guidance** | On/off and volume |
 | **Pause on removal** | Wear-detection behaviour |
@@ -139,7 +144,10 @@ Learned the hard way while building v0.2:
    not end the session. Log it and carry on.
 2. **Verify against hardware, not just the fake device.** Every serious bug in v0.2 — the
    missing ACKs, the sequence numbering, the 10-band EQ, the Custom preset — passed the unit
-   tests and failed on the real headset.
+   tests and failed on the real headset. **Everything added after v0.3.0 is in this position
+   right now**: the device list, auto ambient level, Speak-to-Chat, DSEE and connection quality
+   all pass their tests and none has met a real headset. Expect at least one of them to be
+   wrong.
 3. **Check CI actually runs.** It was red for its first several commits while being described
    as green.
 4. **Gate on the capability bitmap**, never on the model name.

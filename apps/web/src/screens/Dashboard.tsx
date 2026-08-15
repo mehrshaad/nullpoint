@@ -5,6 +5,7 @@ import { customEqKey } from "../state/useSettings.js";
 import { TitleBar } from "./TitleBar.js";
 import { DeviceArt } from "../components/DeviceArt.js";
 import { ConnectedDevices } from "../components/ConnectedDevices.js";
+import { SoundSettings } from "../components/SoundSettings.js";
 import { NoiseModeSegmented } from "../components/NoiseModeSegmented.js";
 import { AmbientLevelSlider } from "../components/AmbientLevelSlider.js";
 import { EqualizerPanel } from "../components/EqualizerPanel.js";
@@ -312,16 +313,23 @@ export function Dashboard({
           <div />
         )}
 
-        {/* Full width beneath both panels: a list reads better wide than in a narrow column,
-            and it stays a single column on small screens for free. Absent entirely on devices
-            that don't report a paired-device list rather than shown empty. */}
+        <SoundSettings
+          connectionMode={state.connectionMode}
+          upscaling={state.upscaling}
+          speakToChat={state.speakToChat}
+          onConnectionModeChange={(mode) => void headphones.setConnectionMode(mode)}
+          onUpscalingChange={(value) => void headphones.setUpscaling(value)}
+          onSpeakToChatChange={(next) => void headphones.setSpeakToChat(next)}
+        />
+
+        {/* Flows into the second column beside SOUND & SPEECH rather than spanning the width:
+            stretched across an ultrawide, three device rows leave an enormous gap between the
+            name and its buttons. Absent entirely on headphones that don't report a list. */}
         {state.pairedDevices && (
-          <div style={{ gridColumn: "1 / -1" }}>
-            <ConnectedDevices
-              devices={state.pairedDevices}
-              onSetConnection={(address, connect) => headphones.setDeviceConnection(address, connect)}
-            />
-          </div>
+          <ConnectedDevices
+            devices={state.pairedDevices}
+            onSetConnection={(address, connect) => headphones.setDeviceConnection(address, connect)}
+          />
         )}
       </div>
     </div>

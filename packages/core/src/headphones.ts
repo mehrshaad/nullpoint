@@ -2,16 +2,22 @@
 // Orchestration source: src/Headphones.{h,cpp} @ master (selectively — see PLAN.md §6 porting map).
 
 import {
+  AudioInquiredType,
   CommandT1,
   CommandT2,
   ConnectivityActionType,
   DataType,
+  DetectSensitivity,
   DeviceInfoType,
   EqPresetId,
+  FunctionTypeT1,
+  ModeOutTime,
   NoiseAdaptiveSensitivity,
   PeripheralInquiredType,
   PeripheralOutcome,
   PowerInquiredType,
+  PriorMode,
+  UpscalingTypeAutoOff,
 } from "./constants.js";
 import { FrameReassembler, packageDataForBt, type DecodedFrame } from "./framing.js";
 import type { Transport } from "./transport.js";
@@ -20,6 +26,8 @@ import * as Battery from "./payloads/battery.js";
 import * as NcAsm from "./payloads/ncasm.js";
 import * as Eq from "./payloads/eq.js";
 import * as Peripheral from "./payloads/peripheral.js";
+import * as Audio from "./payloads/audio.js";
+import * as System from "./payloads/system.js";
 
 export interface HeadphonesState {
   modelName: string | null;
@@ -30,6 +38,14 @@ export interface HeadphonesState {
   eq: Eq.EqState | null;
   /** Null until asked for, and on devices that don't speak Table 2. Empty array = asked, none. */
   pairedDevices: Peripheral.PairedDevice[] | null;
+  /**
+   * The settings below are null on headphones whose capability bitmap doesn't claim them. Null
+   * means "not offered by this hardware", which is what the UI keys off to omit the control
+   * entirely rather than show one that writes nothing.
+   */
+  connectionMode: PriorMode | null;
+  upscaling: UpscalingTypeAutoOff | null;
+  speakToChat: System.SpeakToChatState | null;
 }
 
 /**
@@ -44,8 +60,10 @@ export type HeadphonesEvent =
   | { type: "ncAsm"; state: NcAsm.NcAsmState; origin: StateOrigin }
   | { type: "eq"; state: Eq.EqState; origin: StateOrigin }
   | { type: "pairedDevices"; devices: Peripheral.PairedDevice[] }
+  /** One of the capability-gated extras (connection quality, DSEE, Speak-to-Chat) changed. */
+  | { type: "settings" }
   | { type: "deviceInfo" }
-  | { type: "writeFailed"; feature: "ncAsm" | "eq" }
+  | { type: "writeFailed"; feature: "ncAsm" | "eq" | "connectionMode" | "upscaling" | "speakToChat" }
   /**
    * The link is still open but the headset has stopped accepting commands — in practice
    * because another device (usually a phone on multipoint) has taken the control channel.
@@ -85,6 +103,9 @@ export class Headphones {
     ncAsm: null,
     eq: null,
     pairedDevices: null,
+    connectionMode: null,
+    upscaling: null,
+    speakToChat: null,
   };
 
   constructor(private transport: Transport) {
@@ -157,6 +178,8 @@ export class Headphones {
     await this.request(DataType.DATA_MDR, NcAsm.encodeGetNcAsm(this.ncAsmVariant), CommandT1.NCASM_RET_PARAM);
     await this.request(DataType.DATA_MDR, Eq.encodeGetEq(), CommandT1.EQEBB_RET_PARAM);
 
+    await this.readExtraSettings();
+
     this.startBatteryRefresh();
 
     // Deliberately not awaited. A headset that advertises Table 2 but doesn't answer the
@@ -166,6 +189,109 @@ export class Headphones {
     void this.refreshPairedDevices();
 
     return this.state;
+  }
+
+  private supports(fn: FunctionTypeT1): boolean {
+    return this.state.supportedFunctions.has(fn);
+  }
+
+  /**
+   * Reads the capability-gated extras. Each is asked for only if the bitmap claims it, so a
+   * headset that doesn't have the feature is never made to answer a question about it, and
+   * `state.<setting>` stays null — which is how the UI knows not to draw the control.
+   */
+  private async readExtraSettings(): Promise<void> {
+    if (this.supports(FunctionTypeT1.CONNECTION_MODE_SOUND_QUALITY_CONNECTION_QUALITY)) {
+      await this.request(
+        DataType.DATA_MDR,
+        Audio.encodeGetAudioParam(AudioInquiredType.CONNECTION_MODE),
+        CommandT1.AUDIO_RET_PARAM
+      );
+    }
+    if (this.supports(FunctionTypeT1.UPSCALING_AUTO_OFF)) {
+      await this.request(
+        DataType.DATA_MDR,
+        Audio.encodeGetAudioParam(AudioInquiredType.UPSCALING),
+        CommandT1.AUDIO_RET_PARAM
+      );
+    }
+    if (this.supports(FunctionTypeT1.SMART_TALKING_MODE_TYPE2)) {
+      await this.request(DataType.DATA_MDR, System.encodeGetSpeakToChat(), CommandT1.SYSTEM_RET_PARAM);
+      await this.request(
+        DataType.DATA_MDR,
+        System.encodeGetSpeakToChatDetail(),
+        CommandT1.SYSTEM_RET_EXT_PARAM
+      );
+    }
+  }
+
+  /** Sound quality vs. a stable link — on LDAC devices this is the 990kbps tradeoff. */
+  async setConnectionMode(mode: PriorMode): Promise<void> {
+    await this.writeSetting("connectionMode", mode, () =>
+      Audio.encodeSetAudioParam(AudioInquiredType.CONNECTION_MODE, mode)
+    );
+  }
+
+  /** DSEE Extreme upscaling. */
+  async setUpscaling(value: UpscalingTypeAutoOff): Promise<void> {
+    await this.writeSetting("upscaling", value, () =>
+      Audio.encodeSetAudioParam(AudioInquiredType.UPSCALING, value)
+    );
+  }
+
+  /**
+   * Speak-to-Chat. On/off and the detail settings are separate messages upstream
+   * (Headphones.cpp:262-280), so only what actually changed is written.
+   */
+  async setSpeakToChat(next: System.SpeakToChatState): Promise<void> {
+    const current = this.state.speakToChat;
+    if (!current) throw new Error("These headphones don't support Speak-to-Chat.");
+    const previous = current;
+    this.state.speakToChat = next;
+    this.emit({ type: "settings" });
+    try {
+      if (next.enabled !== previous.enabled) {
+        await this.send(DataType.DATA_MDR, System.encodeSetSpeakToChat(next.enabled));
+      }
+      if (next.sensitivity !== previous.sensitivity || next.timeout !== previous.timeout) {
+        await this.send(
+          DataType.DATA_MDR,
+          System.encodeSetSpeakToChatDetail(next.sensitivity, next.timeout)
+        );
+      }
+      this.noteResponsive();
+    } catch {
+      this.state.speakToChat = previous;
+      this.emit({ type: "settings" });
+      this.emit({ type: "writeFailed", feature: "speakToChat" });
+      this.noteControlLost();
+    }
+  }
+
+  /**
+   * Paint the new value, write it, and put the old one back if the headset never took it —
+   * the same contract every other control in the app follows.
+   */
+  private async writeSetting<K extends "connectionMode" | "upscaling">(
+    key: K,
+    value: NonNullable<HeadphonesState[K]>,
+    encode: () => Uint8Array
+  ): Promise<void> {
+    const previous = this.state[key];
+    if (previous === null) {
+      throw new Error(`These headphones don't support ${key}.`);
+    }
+    this.state[key] = value;
+    this.emit({ type: "settings" });
+    try {
+      await this.send(DataType.DATA_MDR, encode());
+      this.noteResponsive();
+    } catch {
+      this.state[key] = previous;
+      this.emit({ type: "settings" });
+      this.emit({ type: "writeFailed", feature: key });
+      this.noteControlLost();
+    }
   }
 
   /**
@@ -588,6 +714,37 @@ export class Headphones {
         const eq = Eq.decodeEq(frame.payload);
         this.state.eq = eq;
         this.emit({ type: "eq", state: eq, origin: command === CommandT1.EQEBB_NTFY_PARAM ? "device" : "local" });
+        break;
+      }
+      case CommandT1.AUDIO_RET_PARAM:
+      case CommandT1.AUDIO_NTFY_PARAM: {
+        const param = Audio.decodeAudioParam(frame.payload);
+        if (!param) break;
+        if (param.type === AudioInquiredType.CONNECTION_MODE) this.state.connectionMode = param.value;
+        else this.state.upscaling = param.value;
+        this.emit({ type: "settings" });
+        break;
+      }
+      case CommandT1.SYSTEM_RET_PARAM:
+      case CommandT1.SYSTEM_NTFY_PARAM: {
+        const enabled = System.decodeSpeakToChatEnabled(frame.payload);
+        if (enabled === null) break;
+        // The detail settings arrive in their own message, so keep whatever we already know.
+        this.state.speakToChat = {
+          sensitivity: DetectSensitivity.AUTO,
+          timeout: ModeOutTime.MID,
+          ...this.state.speakToChat,
+          enabled,
+        };
+        this.emit({ type: "settings" });
+        break;
+      }
+      case CommandT1.SYSTEM_RET_EXT_PARAM:
+      case CommandT1.SYSTEM_NTFY_EXT_PARAM: {
+        const detail = System.decodeSpeakToChatDetail(frame.payload);
+        if (!detail) break;
+        this.state.speakToChat = { enabled: false, ...this.state.speakToChat, ...detail };
+        this.emit({ type: "settings" });
         break;
       }
     }

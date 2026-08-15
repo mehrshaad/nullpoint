@@ -76,6 +76,72 @@ export enum CommandT1 {
   NCASM_RET_PARAM = 0x67,
   NCASM_SET_PARAM = 0x68,
   NCASM_NTFY_PARAM = 0x69,
+
+  /** Connection quality and DSEE upscaling live here. ProtocolV2T1.h:182-192 */
+  AUDIO_GET_PARAM = 0xe6,
+  AUDIO_RET_PARAM = 0xe7,
+  AUDIO_SET_PARAM = 0xe8,
+  AUDIO_NTFY_PARAM = 0xe9,
+
+  /** Speak-to-Chat lives here, across both the param and ext-param pairs. ProtocolV2T1.h:194-210 */
+  SYSTEM_GET_PARAM = 0xf6,
+  SYSTEM_RET_PARAM = 0xf7,
+  SYSTEM_SET_PARAM = 0xf8,
+  SYSTEM_NTFY_PARAM = 0xf9,
+  SYSTEM_GET_EXT_PARAM = 0xfa,
+  SYSTEM_RET_EXT_PARAM = 0xfb,
+  SYSTEM_SET_EXT_PARAM = 0xfc,
+  SYSTEM_NTFY_EXT_PARAM = 0xfd,
+}
+
+/** ProtocolV2T1.h:4855-4869 */
+export enum AudioInquiredType {
+  CONNECTION_MODE = 0x00,
+  UPSCALING = 0x01,
+}
+
+/** ProtocolV2T1.h:5595-5638 (subset). */
+export enum SystemInquiredType {
+  SMART_TALKING_MODE_TYPE2 = 0x0c,
+}
+
+/**
+ * Constants.h:82-94. **Note the inversion**: `ENABLE` is 0 and `DISABLE` is 1, the opposite of
+ * the OnOff enum used elsewhere in the same protocol. Assuming the usual mapping here silently
+ * inverts every setting that uses it.
+ */
+export enum EnableDisable {
+  ENABLE = 0,
+  DISABLE = 1,
+}
+
+/** Bluetooth connection quality — the LDAC 990kbps vs. stable-link tradeoff. ProtocolV2T1.h:4909-4914 */
+export enum PriorMode {
+  SOUND_QUALITY = 0x00,
+  CONNECTION_QUALITY = 0x01,
+  LOW_LATENCY_BETA = 0x02,
+}
+
+/** DSEE Extreme. ProtocolV2T1.h:4928-4932 */
+export enum UpscalingTypeAutoOff {
+  OFF = 0x00,
+  AUTO = 0x01,
+}
+
+/** How readily Speak-to-Chat decides you're talking. ProtocolV2T1.h:6474-6479 */
+export enum DetectSensitivity {
+  AUTO = 0x00,
+  HIGH = 0x01,
+  LOW = 0x02,
+}
+
+/** How long Speak-to-Chat waits before handing you back your music. ProtocolV2T1.h:6493-6499 */
+export enum ModeOutTime {
+  FAST = 0x00,
+  MID = 0x01,
+  SLOW = 0x02,
+  /** Never resumes on its own. */
+  NONE = 0x03,
 }
 
 /**
@@ -150,6 +216,9 @@ export enum FunctionTypeT1 {
   MODE_NC_ASM_NOISE_CANCELLING_DUAL_AUTO_AMBIENT_SOUND_MODE_LEVEL_ADJUSTMENT = 0x68,
   MODE_NC_ASM_NOISE_CANCELLING_DUAL_AMBIENT_SOUND_MODE_LEVEL_ADJUSTMENT = 0x6b,
   MODE_NC_ASM_NOISE_CANCELLING_DUAL_AMBIENT_SOUND_MODE_LEVEL_ADJUSTMENT_NOISE_ADAPTATION = 0x6d,
+  CONNECTION_MODE_SOUND_QUALITY_CONNECTION_QUALITY = 0xe1,
+  UPSCALING_AUTO_OFF = 0xe2,
+  SMART_TALKING_MODE_TYPE2 = 0xfc,
 }
 
 /** ProtocolV2T1.h:2120-2136 */

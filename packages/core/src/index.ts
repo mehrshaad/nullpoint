@@ -7,3 +7,5 @@ export * from "./payloads/battery.js";
 export * from "./payloads/ncasm.js";
 export * from "./payloads/eq.js";
 export * from "./payloads/peripheral.js";
+export * from "./payloads/audio.js";
+export * from "./payloads/system.js";
