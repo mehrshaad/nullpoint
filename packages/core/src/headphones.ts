@@ -8,6 +8,7 @@ import {
   DataType,
   DeviceInfoType,
   EqPresetId,
+  NoiseAdaptiveSensitivity,
   PeripheralInquiredType,
   PeripheralOutcome,
   PowerInquiredType,
@@ -148,9 +149,12 @@ export class Headphones {
     this.state.supportedFunctions = Init.decodeRetSupportFunction(
       await this.request(DataType.DATA_MDR, Init.encodeGetSupportFunction(), CommandT1.CONNECT_RET_SUPPORT_FUNCTION)
     );
+    // Which NC/ASM message shape to write must be decided from the capability bitmap, before
+    // the first GET — the noise-adaptation form carries two extra fields.
+    this.ncAsmVariant = NcAsm.ncAsmVariantFor(this.state.supportedFunctions);
 
     await this.request(DataType.DATA_MDR, Battery.encodeGetBattery(PowerInquiredType.BATTERY), CommandT1.POWER_RET_STATUS);
-    await this.request(DataType.DATA_MDR, NcAsm.encodeGetNcAsm(), CommandT1.NCASM_RET_PARAM);
+    await this.request(DataType.DATA_MDR, NcAsm.encodeGetNcAsm(this.ncAsmVariant), CommandT1.NCASM_RET_PARAM);
     await this.request(DataType.DATA_MDR, Eq.encodeGetEq(), CommandT1.EQEBB_RET_PARAM);
 
     this.startBatteryRefresh();
@@ -225,6 +229,7 @@ export class Headphones {
   private batteryTimer: ReturnType<typeof setInterval> | null = null;
   private hasControl = true;
   private supportsTable2 = false;
+  private ncAsmVariant: NcAsm.NcAsmVariant = "seamless";
 
   /** True while the headset is still accepting our commands. */
   get controllable(): boolean {
@@ -274,6 +279,26 @@ export class Headphones {
     await this.writeNcAsm({ ...this.state.ncAsm, ambientMode: enabled ? 1 : 0 });
   }
 
+  /**
+   * "Auto ambient level" — let the headset adapt the ambient level to how noisy it is around
+   * you. Only headphones speaking the noise-adaptation variant have this; on anything else
+   * `state.ncAsm.autoAmbient` is null and the control is not offered.
+   */
+  async setAutoAmbient(enabled: boolean, sensitivity?: NoiseAdaptiveSensitivity): Promise<void> {
+    const current = this.state.ncAsm;
+    if (!current) throw new Error("setAutoAmbient called before connect()");
+    if (!current.autoAmbient) {
+      throw new Error("These headphones don't support auto ambient level.");
+    }
+    await this.writeNcAsm({
+      ...current,
+      autoAmbient: {
+        enabled,
+        sensitivity: sensitivity ?? current.autoAmbient.sensitivity,
+      },
+    });
+  }
+
   private async writeNcAsm(next: NcAsm.NcAsmState): Promise<void> {
     const confirmed = this.state.ncAsm;
     // Paint immediately (design §5.3 rule 1), but treat it as a guess until the headset says
@@ -290,14 +315,14 @@ export class Headphones {
         // If the write itself fails we never reach the await below, so claim the rejection
         // now — an unowned one surfaces as an unhandled rejection well after we've recovered.
         settled.catch(() => undefined);
-        await this.sendNow(DataType.DATA_MDR, NcAsm.encodeSetNcAsm(next));
+        await this.sendNow(DataType.DATA_MDR, NcAsm.encodeSetNcAsm(next, this.ncAsmVariant));
         await settled;
       });
       this.noteResponsive();
     } catch {
       // No announcement. Ask outright before concluding anything: some changes are quiet.
       try {
-        await this.request(DataType.DATA_MDR, NcAsm.encodeGetNcAsm(), CommandT1.NCASM_RET_PARAM);
+        await this.request(DataType.DATA_MDR, NcAsm.encodeGetNcAsm(this.ncAsmVariant), CommandT1.NCASM_RET_PARAM);
         this.noteResponsive();
         return;
       } catch {

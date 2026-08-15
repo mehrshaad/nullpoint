@@ -270,8 +270,12 @@ export function Dashboard({
               active={noiseModeFromState(ncAsm) === "ambient"}
               level={ncAsm.ambientLevel}
               focusOnVoice={ncAsm.ambientMode === AmbientSoundMode.VOICE}
+              autoAmbient={ncAsm.autoAmbient}
               onLevelChange={(level) => void headphones.setAmbientLevel(level)}
               onFocusOnVoiceChange={(enabled) => void headphones.setFocusOnVoice(enabled)}
+              onAutoAmbientChange={(enabled, sensitivity) =>
+                void headphones.setAutoAmbient(enabled, sensitivity)
+              }
             />
           </div>
         ) : (

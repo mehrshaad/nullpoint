@@ -161,6 +161,13 @@ export enum NcAsmInquiredType {
   ASM_SEAMLESS = 0x22,
 }
 
+/** How eagerly the headset adapts the ambient level to your surroundings. ProtocolV2T1.h:2231-2236 */
+export enum NoiseAdaptiveSensitivity {
+  STANDARD = 0,
+  HIGH = 1,
+  LOW = 2,
+}
+
 /** ProtocolV2T1.h:2163-2167 */
 export enum ValueChangeStatus {
   UNDER_CHANGING = 0,

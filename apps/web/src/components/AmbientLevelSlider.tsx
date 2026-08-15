@@ -1,25 +1,38 @@
+import { NoiseAdaptiveSensitivity } from "@ssc/core";
 import { useLinearDrag } from "./useLinearDrag.js";
 import { Switch } from "./Switch.js";
 
+const SENSITIVITY_OPTIONS: Array<{ value: NoiseAdaptiveSensitivity; label: string }> = [
+  { value: NoiseAdaptiveSensitivity.LOW, label: "LOW" },
+  { value: NoiseAdaptiveSensitivity.STANDARD, label: "STANDARD" },
+  { value: NoiseAdaptiveSensitivity.HIGH, label: "HIGH" },
+];
+
 /**
- * design/Dashboard.dc.html §1e "AmbientLevelSlider". The design also specs an "Auto ambient
- * level" toggle — that maps to the NcAsmParamModeNcDualModeSwitchAsmSeamlessNa protocol variant
- * (ProtocolV2T1.h:2504-2537), which PLAN.md §6 explicitly scopes OUT of v1 ("a documented
- * follow-up"). Shown here using the design's own "unsupported feature" treatment (§5.3 rule 5)
- * rather than faking a control that writes nothing.
+ * design/Dashboard.dc.html §1e "AmbientLevelSlider".
+ *
+ * "Auto ambient level" only exists on headphones that speak the noise-adaptation variant of the
+ * NC/ASM message (ProtocolV2T1.h:2504-2537). Where they don't, `autoAmbient` is null and the
+ * control is omitted entirely rather than shown disabled — a control that cannot work is not
+ * information the person needs.
  */
 export function AmbientLevelSlider({
   active,
   level,
   focusOnVoice,
+  autoAmbient,
   onLevelChange,
   onFocusOnVoiceChange,
+  onAutoAmbientChange,
 }: {
   active: boolean;
   level: number;
   focusOnVoice: boolean;
+  /** Null on headphones without noise adaptation. */
+  autoAmbient: { enabled: boolean; sensitivity: NoiseAdaptiveSensitivity } | null;
   onLevelChange: (level: number) => void;
   onFocusOnVoiceChange: (enabled: boolean) => void;
+  onAutoAmbientChange: (enabled: boolean, sensitivity?: NoiseAdaptiveSensitivity) => void;
 }) {
   const drag = useLinearDrag(0, 20, onLevelChange);
   const frac = level / 20;
@@ -95,15 +108,57 @@ export function AmbientLevelSlider({
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 9, marginTop: 2 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, opacity: 0.45 }}>
-          <div>
-            <div style={{ fontWeight: 500, fontSize: 12, color: "var(--fg2)" }}>Auto ambient level</div>
-            <div className="mono" style={{ marginTop: 3, fontSize: 10, color: "var(--fg3)" }}>
-              NOT IMPLEMENTED IN THIS BUILD
+        {autoAmbient && (
+          <>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+              <div>
+                <div style={{ fontWeight: 500, fontSize: 12, color: "var(--fg2)" }}>Auto ambient level</div>
+                <div className="mono" style={{ marginTop: 3, fontSize: 10, color: "var(--fg3)" }}>
+                  Follows how noisy it is around you
+                </div>
+              </div>
+              <Switch
+                checked={autoAmbient.enabled}
+                onChange={(enabled) => onAutoAmbientChange(enabled)}
+                ariaLabel="Auto ambient level"
+              />
             </div>
-          </div>
-          <Switch checked={false} disabled onChange={() => {}} ariaLabel="Auto ambient level (not implemented)" />
-        </div>
+            {autoAmbient.enabled && (
+              <div
+                role="radiogroup"
+                aria-label="Auto ambient sensitivity"
+                style={{ display: "flex", gap: 6 }}
+              >
+                {SENSITIVITY_OPTIONS.map((option) => {
+                  const selected = autoAmbient.sensitivity === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      role="radio"
+                      aria-checked={selected}
+                      onClick={() => onAutoAmbientChange(true, option.value)}
+                      className="mono"
+                      style={{
+                        flex: 1,
+                        fontWeight: 500,
+                        fontSize: 9.5,
+                        letterSpacing: "0.08em",
+                        padding: "6px 4px",
+                        borderRadius: 6,
+                        cursor: "pointer",
+                        color: selected ? "var(--bg)" : "var(--fg3)",
+                        background: selected ? "var(--amber)" : "none",
+                        border: `1px solid ${selected ? "var(--amber)" : "var(--line)"}`,
+                      }}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
           <div>
             <div style={{ fontWeight: 500, fontSize: 12, color: "var(--fg2)" }}>Focus on voice</div>

@@ -15,6 +15,7 @@ import {
   NcAsmInquiredType,
   OnOff,
   NcAsmMode,
+  NoiseAdaptiveSensitivity,
   AmbientSoundMode,
   ValueChangeStatus,
   EqEbbInquiredType,
@@ -55,13 +56,21 @@ const THINKPAD = "AA:BB:CC:DD:EE:02";
  * @param table2 whether to advertise and answer Protocol V2 Table 2. Off by default, so the
  * majority of tests exercise the same path a device without it takes.
  */
-function createFakeDevice({ table2 = false }: { table2?: boolean } = {}) {
+function createFakeDevice({
+  table2 = false,
+  noiseAdaptation = false,
+}: { table2?: boolean; noiseAdaptation?: boolean } = {}) {
+  const ncAsmType = noiseAdaptation
+    ? NcAsmInquiredType.MODE_NC_ASM_DUAL_NC_MODE_SWITCH_AND_ASM_SEAMLESS_NA
+    : NcAsmInquiredType.MODE_NC_ASM_DUAL_NC_MODE_SWITCH_AND_ASM_SEAMLESS;
   const state = {
     ncAsm: {
       onOff: OnOff.ON as number,
       mode: NcAsmMode.NC as number,
       ambientMode: AmbientSoundMode.NORMAL as number,
       level: 12,
+      autoOn: OnOff.OFF as number,
+      sensitivity: NoiseAdaptiveSensitivity.STANDARD as number,
     },
     eqPreset: EqPresetId.CUSTOM as number,
     eqSteps: [13, 12, 10, 8, 13, 15],
@@ -69,6 +78,18 @@ function createFakeDevice({ table2 = false }: { table2?: boolean } = {}) {
     // read-back that follows reports what actually happened.
     connected: new Set([IPHONE]),
   };
+
+  /** Whichever NC/ASM shape this fake speaks — the noise-adaptation one carries two more bytes. */
+  const ncAsmFrame = (command: CommandT1) => [
+    command,
+    ncAsmType,
+    ValueChangeStatus.CHANGED,
+    state.ncAsm.onOff,
+    state.ncAsm.mode,
+    state.ncAsm.ambientMode,
+    state.ncAsm.level,
+    ...(noiseAdaptation ? [state.ncAsm.autoOn, state.ncAsm.sensitivity] : []),
+  ];
 
   const deviceList = () => [
     pairedDeviceRecord(IPHONE, state.connected.has(IPHONE), 0x5a020c, "Mehrshad's iPhone"),
@@ -131,7 +152,18 @@ function createFakeDevice({ table2 = false }: { table2?: boolean } = {}) {
         break;
       }
       case CommandT1.CONNECT_GET_SUPPORT_FUNCTION:
-        replies.push(mdr([CommandT1.CONNECT_RET_SUPPORT_FUNCTION, ConnectInquiredType.FIXED_VALUE, 2, 0x20, 0, 0x6b, 0]));
+        replies.push(
+          mdr([
+            CommandT1.CONNECT_RET_SUPPORT_FUNCTION,
+            ConnectInquiredType.FIXED_VALUE,
+            2,
+            0x20,
+            0,
+            // 0x6b is the plain level-adjustment function, 0x6d the noise-adaptation one.
+            noiseAdaptation ? 0x6d : 0x6b,
+            0,
+          ])
+        );
         break;
       case CommandT1.POWER_GET_STATUS:
         replies.push(mdr([CommandT1.POWER_RET_STATUS, PowerInquiredType.BATTERY, 78, BatteryChargingStatus.NOT_CHARGING]));
@@ -143,31 +175,14 @@ function createFakeDevice({ table2 = false }: { table2?: boolean } = {}) {
           mode: payload[4]!,
           ambientMode: payload[5]!,
           level: payload[6]!,
+          // Only present on the noise-adaptation shape.
+          autoOn: payload[7] ?? state.ncAsm.autoOn,
+          sensitivity: payload[8] ?? state.ncAsm.sensitivity,
         };
-        replies.push(
-          mdr([
-            CommandT1.NCASM_NTFY_PARAM,
-            NcAsmInquiredType.MODE_NC_ASM_DUAL_NC_MODE_SWITCH_AND_ASM_SEAMLESS,
-            ValueChangeStatus.CHANGED,
-            state.ncAsm.onOff,
-            state.ncAsm.mode,
-            state.ncAsm.ambientMode,
-            state.ncAsm.level,
-          ])
-        );
+        replies.push(mdr(ncAsmFrame(CommandT1.NCASM_NTFY_PARAM)));
         break;
       case CommandT1.NCASM_GET_PARAM:
-        replies.push(
-          mdr([
-            CommandT1.NCASM_RET_PARAM,
-            NcAsmInquiredType.MODE_NC_ASM_DUAL_NC_MODE_SWITCH_AND_ASM_SEAMLESS,
-            ValueChangeStatus.CHANGED,
-            state.ncAsm.onOff,
-            state.ncAsm.mode,
-            state.ncAsm.ambientMode,
-            state.ncAsm.level,
-          ])
-        );
+        replies.push(mdr(ncAsmFrame(CommandT1.NCASM_RET_PARAM)));
         break;
 
       case CommandT1.EQEBB_SET_PARAM: {
@@ -208,6 +223,8 @@ describe("Headphones.connect() over a fake device", () => {
       ambientMode: AmbientSoundMode.NORMAL,
       ambientLevel: 12,
       settled: true,
+      // This fake advertises the plain level-adjustment function, so there is no auto ambient.
+      autoAmbient: null,
     });
     expect(state.eq).toEqual({
       preset: EqPresetId.CUSTOM,
@@ -388,6 +405,71 @@ describe("Headphones.connect() over a fake device", () => {
     hp.on((e) => events.push(e.type));
     transport.simulateDisconnect();
     expect(events).toEqual(["disconnected"]);
+  });
+
+  it("uses the noise-adaptation message shape when the headset advertises it", async () => {
+    const transport = new LoopbackTransport(createFakeDevice({ noiseAdaptation: true }));
+    const hp = new Headphones(transport);
+    const state = await hp.connect();
+
+    expect(state.ncAsm?.autoAmbient).toEqual({
+      enabled: false,
+      sensitivity: NoiseAdaptiveSensitivity.STANDARD,
+    });
+    // Both the GET and the SET must carry the NA inquired type, or the headset answers with a
+    // shape we then fail to decode.
+    const ncAsmFrames = transport.sent
+      .map((f) => decodeFrameBody(f.subarray(1, f.length - 1)))
+      .filter((f) => f.payload[0] === CommandT1.NCASM_GET_PARAM);
+    expect(ncAsmFrames.length).toBeGreaterThan(0);
+    expect(ncAsmFrames[0]!.payload[1]).toBe(
+      NcAsmInquiredType.MODE_NC_ASM_DUAL_NC_MODE_SWITCH_AND_ASM_SEAMLESS_NA
+    );
+  });
+
+  it("turns auto ambient level on and sets its sensitivity", async () => {
+    const transport = new LoopbackTransport(createFakeDevice({ noiseAdaptation: true }));
+    const hp = new Headphones(transport);
+    await hp.connect();
+
+    await hp.setAutoAmbient(true, NoiseAdaptiveSensitivity.HIGH);
+
+    expect(hp.state.ncAsm?.autoAmbient).toEqual({
+      enabled: true,
+      sensitivity: NoiseAdaptiveSensitivity.HIGH,
+    });
+    // 9 bytes, not 7 — the two trailing noise-adaptation fields must actually go out.
+    const sets = transport.sent
+      .map((f) => decodeFrameBody(f.subarray(1, f.length - 1)))
+      .filter((f) => f.payload[0] === CommandT1.NCASM_SET_PARAM);
+    const last = sets[sets.length - 1]!;
+    expect(last.payload.length).toBe(9);
+    expect(last.payload[7]).toBe(OnOff.ON);
+    expect(last.payload[8]).toBe(NoiseAdaptiveSensitivity.HIGH);
+  }, 20_000);
+
+  it("keeps auto ambient settings intact when only the noise mode changes", async () => {
+    // Every NC/ASM write sends the whole message, so a mode change that dropped these fields
+    // would silently switch auto ambient off.
+    const transport = new LoopbackTransport(createFakeDevice({ noiseAdaptation: true }));
+    const hp = new Headphones(transport);
+    await hp.connect();
+    await hp.setAutoAmbient(true, NoiseAdaptiveSensitivity.LOW);
+
+    await hp.setNoiseMode("ambient");
+
+    expect(hp.state.ncAsm?.autoAmbient).toEqual({
+      enabled: true,
+      sensitivity: NoiseAdaptiveSensitivity.LOW,
+    });
+  }, 20_000);
+
+  it("refuses auto ambient on headphones that don't have it", async () => {
+    const transport = new LoopbackTransport(createFakeDevice());
+    const hp = new Headphones(transport);
+    await hp.connect();
+
+    await expect(hp.setAutoAmbient(true)).rejects.toThrow(/don't support/i);
   });
 
   it("reads the paired device list, with a kind per Bluetooth Class of Device", async () => {

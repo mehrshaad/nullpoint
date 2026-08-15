@@ -41,6 +41,8 @@ function useFrame(mode: NoiseMode): Uint8Array {
           ambientLevel: 14,
           // Only read back off the wire, never sent — a value we're setting is by definition final.
           settled: true,
+          // The inspector demonstrates the plain 7-byte message, so no noise-adaptation fields.
+          autoAmbient: null,
         })
       ),
     [mode]
