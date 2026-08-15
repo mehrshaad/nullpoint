@@ -51,9 +51,10 @@ every connection.
 
 **Still open:**
 
-- Connect and disconnect from the panel are written but not yet exercised on hardware.
-- Merely-paired devices report an unknown Bluetooth class (`0xFFFFFF`), so only connected ones
-  get a device-specific icon; the rest fall back to the generic one.
+- Connecting a device when both multipoint slots are full silently does nothing — the headset
+  refuses and the row gives no feedback. Worth surfacing.
+- Merely-paired devices report an unknown Bluetooth class (`0xFFFFFF`); their icon is guessed
+  from the device name instead, which covers the common ones and falls back to generic.
 - Pairing mode (put the headset into pairing) is not implemented.
 - Unpair is deliberately left out: irreversible from the app, and nothing needs it.
 
@@ -164,7 +165,13 @@ and a device in slot 2 read as disconnected. Details in [`PROTOCOL.md`](./PROTOC
 **The lesson worth keeping:** two of the three "bugs" first reported from this session were
 misreadings of the app's own UI text. The bytes settled all three. Read the frames.
 
-Still unverified: connect/disconnect from the device panel, and power off.
+Connect, disconnect and power off are verified too. Connecting a third device really does
+connect it — and because the XM6 holds only **two** at once, doing so evicts one of the
+existing pair. That is the headset's behaviour, not a fault, but it is worth knowing before
+pressing the button: connecting something can silently drop the phone you were listening on.
+Power off leaves the headset unreachable until its own power button is pressed; a Bluetooth
+socket timeout (`0x274C`) rather than "address in use" (`0x2740`) is the signature of a headset
+that is off rather than busy.
 
 ## Standing engineering rules
 

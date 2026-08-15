@@ -87,8 +87,8 @@ The one constraint is that the headphones hand out that settings channel to **on
 - No code-signing identity. Windows SmartScreen warns on the installer, and the macOS build is ad-hoc signed rather than notarized.
 - Only the single-battery reading is wired up, so earbuds won't show per-bud or case levels.
 - Every control appears only if your headphones report the matching capability. On a WH-1000XM6 that means no connection-quality setting, because it doesn't advertise one — Settings shows exactly what yours reported.
-- Devices that are paired but not currently connected don't report their device type, so they get a generic icon.
-- Connect/disconnect from the device panel, and power off, are built but not yet exercised on hardware.
+- Devices that are paired but not currently connected don't report their device type, so their icon is guessed from the device name.
+- These headphones hold **two** devices at once, so connecting a third from the device panel disconnects one of the existing pair. If both slots are already full the connection is simply refused, currently without saying so.
 - The connected-device panel is built but unverified on hardware — it appears only if your headphones report Protocol V2 Table 2 support, and silently doesn't if they don't.
 - See [`PLAN.md`](./PLAN.md) for what's planned next, including Adaptive Sound Control.
 - Confirmed on **WH-1000XM6** (firmware 3.1.5) and **WH-CH720N**. Other Sony models use the same protocol and should work, but are unverified — [reports welcome](https://github.com/mehrshaad/nullpoint/issues).

@@ -22,7 +22,16 @@ export function App() {
         update={update}
         isDesktop={isDesktop}
         deviceState={deviceState}
-        onPowerOff={headphones ? () => void headphones.powerOff() : undefined}
+        // Back to the dashboard on the way out: Settings shows no connection state, so
+        // powering the headphones off from here otherwise looks like nothing happened.
+        onPowerOff={
+          headphones
+            ? () => {
+                void headphones.powerOff();
+                setShowSettings(false);
+              }
+            : undefined
+        }
         onDone={() => setShowSettings(false)}
       />
     );
