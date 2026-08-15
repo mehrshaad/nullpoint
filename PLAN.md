@@ -1,8 +1,9 @@
-# Nullpoint — plan for v0.3 and beyond
+# Nullpoint — plan beyond v0.3
 
-v0.2.2 shipped and works: it connects to a WH-1000XM6, reads model/firmware/battery, and
-controls noise mode and the equalizer, on Windows, macOS and the web. The build-out plan that
-got us there is finished; the wire-protocol reference it contained now lives in
+v0.3.0 shipped: it connects to a WH-1000XM6, reads model/firmware/battery, controls noise mode
+and the equalizer, holds its connection through interruptions, and can be driven from a computer
+while a phone plays music — on Windows, macOS and the web. The build-out plan that got us there
+is finished; the wire-protocol reference it contained now lives in
 [`PROTOCOL.md`](./PROTOCOL.md).
 
 This document is what comes next. Phases are ordered by value, and each one is independently
