@@ -10,6 +10,8 @@ import {
   packageDataForBt,
   type NoiseMode,
 } from "@ssc/core";
+import { HeadphoneSketch } from "./HeadphoneSketch.js";
+import { NullpointMark } from "../components/NullpointMark.js";
 import { DeviceArt } from "../components/DeviceArt.js";
 import "./landing.css";
 
@@ -290,7 +292,7 @@ export function Landing() {
       <nav className="lp-nav">
         <div className="lp-wrap lp-nav-inner">
           <div className="lp-mark">
-            <span className="lp-dot" />
+            <NullpointMark size={15} />
             NULLPOINT
           </div>
           <div className="lp-nav-links">
@@ -308,16 +310,9 @@ export function Landing() {
       </nav>
 
       <header className="lp-wrap lp-hero">
-        {/* The hero device is held back for now. Everything it needs is still here — the cut-out
-            at ./xm6.png and the .lp-device rules in landing.css, shadow and scroll drift
-            included. To bring it back, restore the import and this block:
-
-              <div className="lp-device" aria-hidden="true">
-                <img src={xm6Photo} width={692} height={1050} alt="" loading="eager" decoding="async" />
-              </div>
-
-            Deliberately not merely hidden with CSS: an unreferenced asset is left out of the
-            build entirely, so nothing ships to the site until it is wanted. */}
+        <div className="lp-device" aria-hidden="true">
+          <HeadphoneSketch />
+        </div>
 
         <div className="lp-eyebrow lp-rise">
           <span>UNOFFICIAL CLIENT</span>

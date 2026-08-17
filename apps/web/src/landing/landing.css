@@ -68,12 +68,10 @@
   letter-spacing: 0.22em;
 }
 
-.lp-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--accent);
-  flex: none;
+/* The wordmark carries the app mark itself now — the zero from the icon — rather than a plain
+   dot. It inherits colour, so the accent setting still drives it. */
+.lp-mark svg {
+  color: var(--accent);
 }
 
 .lp-nav-links {
@@ -661,18 +659,19 @@
   z-index: 0;
   pointer-events: none;
   /* Anchored to the right edge and allowed past it — the crop is the point. */
-  right: clamp(-56px, -2.5vw, 0px);
-  top: 4px;
-  /* The art is a tall 692x1050 crop, so width is the constrained axis — 420px puts the cups
-     just far enough down to be cut by the panel below. */
-  width: clamp(250px, 30vw, 420px);
-  /* Two shadows: a tight one to seat the object, a wide soft one so it does not look pasted on.
-     drop-shadow follows the alpha, so it traces the headphones rather than a bounding box. */
-  filter: drop-shadow(0 18px 22px rgba(8, 10, 14, 0.3)) drop-shadow(0 46px 70px rgba(8, 10, 14, 0.22));
+  /* Pulled in off the right edge — hanging it at the margin left the drawing stranded away
+     from the copy it belongs with. */
+  right: clamp(8px, 3.5vw, 72px);
+  top: 34px;
+  /* A drawing, not a photograph — it needs no shadow, and it wants to be wider than the tall
+     product crop was. */
+  width: clamp(300px, 42vw, 520px);
+  color: var(--fg);
   will-change: transform;
 }
 
-.lp-device img {
+.lp-device img,
+.lp-device svg {
   display: block;
   width: 100%;
   height: auto;
