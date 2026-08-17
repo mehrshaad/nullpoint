@@ -30,6 +30,18 @@ nsis:
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: Nullpoint
+  # Artwork is generated, not drawn by hand — see scripts/make-installer-art.cjs. The wave from
+  # the app icon runs down the sidebar and settles flat; the uninstaller runs it back in amber.
+  installerHeader: build/installerHeader.bmp
+  installerSidebar: build/installerSidebar.bmp
+  uninstallerSidebar: build/uninstallerSidebar.bmp
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+  installerHeaderIcon: build/icon.ico
+  # Apache-2.0. Worth showing given the app talks to hardware over an undocumented protocol.
+  license: ../../LICENSE
+  runAfterFinish: true
+  deleteAppDataOnUninstall: false
 
 mac:
   target:
@@ -44,6 +56,25 @@ mac:
   # We have no Apple identity, so electron-builder skips signing; scripts/adhoc-sign.cjs then
   # ad-hoc signs the bundle, without which Apple Silicon refuses to launch it at all.
   identity: null
+
+# The drag-to-install window. Coordinates are the centres of the two icons, and the background
+# art is drawn to put its arrow between them at exactly this geometry — change one and the
+# other stops lining up.
+dmg:
+  title: Nullpoint ${version}
+  background: build/dmg/background.png
+  window:
+    width: 540
+    height: 380
+  iconSize: 96
+  contents:
+    - x: 150
+      y: 232
+      type: file
+    - x: 390
+      y: 232
+      type: link
+      path: /Applications
 
 afterPack: scripts/adhoc-sign.cjs
 
