@@ -174,7 +174,12 @@
   transform: translateY(1px);
 }
 
-.lp-btn-primary {
+/* Scoped under .lp deliberately. `.lp a { color: inherit }` is a class plus an element, which
+   outweighs a lone class — so a bare `.lp-btn-primary` lost the colour fight and the label had
+   always been inherited --fg, never the value set here. That put near-black on the light
+   theme's dark blue and near-white on the dark theme's light blue: unreadable both ways, and
+   invisible to any amount of correcting the token itself. */
+.lp .lp-btn-primary {
   background: var(--accent);
   color: var(--on-accent);
 }
@@ -184,7 +189,7 @@
   transform: translateY(-1px);
 }
 
-.lp-btn-ghost {
+.lp .lp-btn-ghost {
   border-color: var(--line);
   color: var(--fg);
 }

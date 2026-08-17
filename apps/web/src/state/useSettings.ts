@@ -152,6 +152,26 @@ function applyAccent(accent: AccentName, theme: AppSettings["theme"]): void {
 }
 
 /**
+ * Keeps the document in step with the OS theme for pages that never mount useSettings.
+ *
+ * The landing page is rendered straight from main.tsx without the hook, so "system" was
+ * resolved once by the pre-paint script in index.html and then never again — switch the OS to
+ * light while looking at it and it stayed dark until a reload. Returns an unsubscribe.
+ */
+export function startThemeSync(): () => void {
+  const settings = loadLocal();
+  const apply = () => {
+    applyTheme(settings.theme);
+    applyAccent(settings.accent, settings.theme);
+  };
+  apply();
+  if (settings.theme !== "system") return () => undefined;
+  const query = window.matchMedia(DARK_QUERY);
+  query.addEventListener("change", apply);
+  return () => query.removeEventListener("change", apply);
+}
+
+/**
  * Reads and writes app settings, persisting to the desktop shell over IPC when running in
  * Electron and to localStorage in the browser. `isDesktop` gates the rows that only mean
  * something in the desktop app (launch at login, tray behaviour).
