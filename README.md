@@ -28,6 +28,8 @@ Sony's official "Sound Connect" app (Android/iOS only) talks to the headphones o
 
 Either way, **pair the headphones in your OS Bluetooth settings first** — Nullpoint can't pair for you.
 
+**Only one copy of Nullpoint can hold the settings channel.** If the desktop app is running in your tray, the web app can't connect, and vice versa. Music keeps playing either way — audio and settings travel separately.
+
 ## Getting started
 
 Requires Node 22+ (pnpm 11 needs it) and pnpm.

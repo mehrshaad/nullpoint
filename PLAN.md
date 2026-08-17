@@ -173,12 +173,30 @@ Power off leaves the headset unreachable until its own power button is pressed; 
 socket timeout (`0x274C`) rather than "address in use" (`0x2740`) is the signature of a headset
 that is off rather than busy.
 
+## Two failure modes that look like broken headphones
+
+Both were reported as hardware faults and neither was. Worth recognising on sight.
+
+**Audio playing does not mean the settings channel is available.** Music is A2DP and keeps going
+regardless; settings ride a separate single-occupancy RFCOMM channel. The usual occupant is
+another copy of Nullpoint — the tray app holds it for as long as it runs. Windows distinguishes
+the cases: `0x2740` means something else holds the channel, `0x274C` means nothing is answering
+at all, which in practice means the headset is off.
+
+**A decode error takes out a whole panel, silently.** Guarding the read loop against exceptions
+keeps the session alive, which is right, but the state that frame carried is simply never set —
+so the panel renders nothing and the app looks like it forgot a feature. v0.3.0 lost noise
+control this way for a full release: it required a 7-byte NC/ASM frame and the WH-1000XM6 sends
+9. If a panel is missing rather than empty, suspect a swallowed decode before anything else.
+
 ## Standing engineering rules
 
 Learned the hard way while building v0.2:
 
 1. **Never let a decode error escape onto the transport read loop.** One unreadable frame must
-   not end the session. Log it and carry on.
+   not end the session. Log it and carry on — but note the cost: the state that frame carried
+   stays unset, so the feature disappears from the UI rather than reporting a fault. Decoders
+   should widen to accept what the hardware sends, not lean on the guard.
 2. **Verify against hardware, not just the fake device.** Every serious bug in v0.2 — the
    missing ACKs, the sequence numbering, the 10-band EQ, the Custom preset — passed the unit
    tests and failed on the real headset. **Everything added after v0.3.0 is in this position
