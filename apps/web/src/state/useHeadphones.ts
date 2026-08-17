@@ -86,9 +86,18 @@ const RECONNECT_MAX_MS = 15_000;
 /**
  * Taking a busy channel back is a race, not a wait: you win it by asking at a moment the other
  * device isn't holding it. Backing off to fifteen seconds lost that race almost every time, so
- * this case keeps knocking. One socket open every couple of seconds costs nothing.
+ * this case keeps knocking.
  */
 const RECONNECT_BUSY_MAX_MS = 2500;
+/**
+ * How many times to race before accepting the channel is genuinely occupied. "One socket open
+ * every couple of seconds costs nothing" was wrong: it shares a radio with the audio, and a
+ * successful attempt is a forty-frame handshake. Roughly fifteen seconds of racing catches the
+ * device that grabbed the channel for a moment, which is the case worth winning.
+ */
+const BUSY_RACE_ATTEMPTS = 6;
+/** Once it is clear something is holding on, check back at this interval instead of racing. */
+const RECONNECT_BUSY_CALM_MS = 30_000;
 
 /** The headset is reachable but its control channel is taken (see PROTOCOL.md, 0x2740). */
 function isChannelBusy(err: unknown): boolean {
@@ -163,6 +172,7 @@ export function useHeadphones({ autoReconnect = true }: { autoReconnect?: boolea
       cancelledRef.current = false;
       let reason: "busy" | "gone" = "gone";
       let delay = RECONNECT_BASE_MS;
+      let busyAttempts = 0;
       setConnection({ status: "reconnecting", reason });
 
       while (!cancelledRef.current) {
@@ -178,17 +188,31 @@ export function useHeadphones({ autoReconnect = true }: { autoReconnect?: boolea
           const next: "busy" | "gone" = isChannelBusy(err) ? "busy" : "gone";
           // Start over on the delay whenever the situation changes — a headset that just came
           // back should not inherit the long wait from when it was missing.
-          if (next !== reason) delay = RECONNECT_BASE_MS;
+          if (next !== reason) {
+            delay = RECONNECT_BASE_MS;
+            busyAttempts = 0;
+          }
           reason = next;
           setConnection({ status: "reconnecting", reason });
           // The two cases want opposite behaviour. "Gone" means nothing is listening, so back
           // off; retrying quickly at a headset that is switched off just burns battery. "Busy"
-          // means it is right there and something else is holding the channel — and that is a
-          // race you win by asking often, so keep the interval short and stop compounding.
-          delay =
-            reason === "busy"
-              ? Math.min(Math.round(delay * 1.25), RECONNECT_BUSY_MAX_MS)
-              : Math.min(Math.round(delay * 1.6), RECONNECT_MAX_MS);
+          // means it is right there and something else is holding the channel — a race you win
+          // by asking often.
+          //
+          // But only for a while. Every attempt is a connection on the same radio carrying the
+          // audio, and a successful one is a forty-frame handshake, so racing a phone that has
+          // held the channel for minutes puts a burst on the air every couple of seconds for as
+          // long as it holds — heard as music breaking up at no particular interval. Race hard
+          // enough to win the blips, then settle down and wait it out.
+          if (reason === "busy") {
+            busyAttempts += 1;
+            delay =
+              busyAttempts <= BUSY_RACE_ATTEMPTS
+                ? Math.min(Math.round(delay * 1.25), RECONNECT_BUSY_MAX_MS)
+                : Math.min(Math.round(delay * 1.6), RECONNECT_BUSY_CALM_MS);
+          } else {
+            delay = Math.min(Math.round(delay * 1.6), RECONNECT_MAX_MS);
+          }
         }
       }
     },
