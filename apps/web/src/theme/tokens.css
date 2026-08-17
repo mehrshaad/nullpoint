@@ -24,6 +24,9 @@
   --warn-bg: rgba(229, 138, 107, 0.1);
   --warn-line: rgba(229, 138, 107, 0.32);
   --ring: rgba(110, 166, 239, 0.55);
+  /* Text sitting on --accent. The two themes need opposite answers: the dark palette's accent
+     is a light blue, so it takes near-black (7.9:1) and would be 2.5:1 against white. */
+  --on-accent: #08090b;
   --dot: #2e3238;
   --knob: #0b0c0e;
 }
@@ -51,6 +54,9 @@
   --warn-bg: rgba(180, 85, 47, 0.08);
   --warn-line: rgba(180, 85, 47, 0.28);
   --ring: rgba(44, 107, 201, 0.45);
+  /* ...and the light palette's accent is a dark blue, so it takes white (5.2:1). The button was
+     hardcoded to near-black for both, which measured 3.85:1 here. */
+  --on-accent: #ffffff;
   --dot: #d8d8d2;
   --knob: #ffffff;
 }

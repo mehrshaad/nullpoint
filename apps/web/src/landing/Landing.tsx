@@ -10,6 +10,7 @@ import {
   packageDataForBt,
   type NoiseMode,
 } from "@ssc/core";
+import xm6Photo from "./xm6.png";
 import { DeviceArt } from "../components/DeviceArt.js";
 import "./landing.css";
 
@@ -308,6 +309,19 @@ export function Landing() {
       </nav>
 
       <header className="lp-wrap lp-hero">
+        {/* Sits behind the copy and runs off the bottom of the hero, where the protocol panel
+            crops it. Decorative — the sentence beside it already says what the product is. */}
+        <div className="lp-device" aria-hidden="true">
+          <img
+            src={xm6Photo}
+            width={692}
+            height={1050}
+            alt=""
+            loading="eager"
+            decoding="async"
+          />
+        </div>
+
         <div className="lp-eyebrow lp-rise">
           <span>UNOFFICIAL CLIENT</span>
           <span className="lp-eyebrow-sep" />

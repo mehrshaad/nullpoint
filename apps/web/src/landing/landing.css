@@ -8,6 +8,10 @@
   color: var(--fg);
   /* Landing is authored dark-first; it ignores the app's light theme on purpose. */
   --lp-max: 1080px;
+  /* The hero device deliberately overhangs the right edge. `clip` rather than `hidden` so it
+     is trimmed without turning this into a scroll container, which would break the
+     scroll-driven animation that reads the root scroller. */
+  overflow-x: clip;
 }
 
 .lp a {
@@ -172,7 +176,7 @@
 
 .lp-btn-primary {
   background: var(--accent);
-  color: #08090b;
+  color: var(--on-accent);
 }
 
 .lp-btn-primary:hover {
@@ -632,5 +636,96 @@
   }
   .lp-wire-uuid {
     display: none;
+  }
+}
+
+/* ---------- hero device ---------- */
+
+/* The product, cut out of its backdrop and oversized, running off the bottom of the hero so the
+   protocol panel below crops it. A boxed photo on a plate read as a stock image dropped into a
+   frame; letting it break the grid is what makes it look like it belongs to the page.
+
+   Behind the copy and non-interactive, so it can be as large as it likes without ever getting
+   between a reader and the download button. */
+.lp-hero {
+  position: relative;
+}
+
+.lp-device {
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+  /* Anchored to the right edge and allowed past it — the crop is the point. */
+  right: clamp(-56px, -2.5vw, 0px);
+  top: 4px;
+  /* The art is a tall 692x1050 crop, so width is the constrained axis — 420px puts the cups
+     just far enough down to be cut by the panel below. */
+  width: clamp(250px, 30vw, 420px);
+  /* Two shadows: a tight one to seat the object, a wide soft one so it does not look pasted on.
+     drop-shadow follows the alpha, so it traces the headphones rather than a bounding box. */
+  filter: drop-shadow(0 18px 22px rgba(8, 10, 14, 0.3)) drop-shadow(0 46px 70px rgba(8, 10, 14, 0.22));
+  will-change: transform;
+}
+
+.lp-device img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* Everything readable sits above it. */
+.lp-eyebrow,
+.lp-h1,
+.lp-sub,
+.lp-cta-row,
+.lp-cta-note {
+  position: relative;
+  z-index: 2;
+}
+
+/* The panel is opaque, so it does the cropping simply by being painted after. */
+.lp-wire {
+  position: relative;
+  z-index: 1;
+}
+
+/* Under about 1080px the copy needs the full width, so the device stops competing: it drops
+   behind at low contrast rather than shrinking into an awkward sliver beside the headline. */
+@media (max-width: 1080px) {
+  .lp-device {
+    width: min(56vw, 340px);
+    right: -10vw;
+    top: auto;
+    bottom: -60px;
+    opacity: 0.18;
+    filter: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .lp-device {
+    display: none;
+  }
+}
+
+/* Scroll-driven, off the root scroller rather than view(): the device is above the fold, so a
+   view() timeline would already have finished before anyone scrolled. Without support the image
+   simply sits still, which costs nothing. */
+@keyframes lp-device-drift {
+  from {
+    transform: translateY(0) rotate(0deg) scale(1);
+  }
+  to {
+    transform: translateY(-90px) rotate(-7deg) scale(1.1);
+  }
+}
+
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .lp-device {
+      animation: lp-device-drift linear both;
+      animation-timeline: scroll(root);
+      animation-range: 0 90vh;
+    }
   }
 }
