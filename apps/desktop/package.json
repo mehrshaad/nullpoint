@@ -11,7 +11,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "package": "pnpm --filter @ssc/web run build && pnpm run build && electron-builder --config electron-builder.yml",
     "package:win": "pnpm run package --win",
-    "art": "electron scripts/make-installer-art.cjs"
+    "art": "electron scripts/make-installer-art.cjs",
+    "icons": "electron ../../scripts/make-icons.cjs && python ../../scripts/derive-icons.py"
   },
   "devDependencies": {
     "@types/node": "^22.9.0",
