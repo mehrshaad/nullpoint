@@ -124,6 +124,22 @@ export enum AudioInquiredType {
   UPMIX_CINEMA = 0x04,
   /** Same payload as BGM_MODE; headsets advertising 0xEB answer on this one. */
   BGM_MODE_AND_ERRORCODE = 0x09,
+  /** One picker for all the spatial upmixes, where a headset offers it. */
+  UPMIX_SERIES = 0x0a,
+}
+
+/**
+ * Sony's spatial upmixes as a single choice. ProtocolV2T1.h:4987-4993.
+ *
+ * `MUSIC` is the one people mean by "3D music" — it spreads a stereo mix out around you rather
+ * than leaving it between your ears. Distinct from the standalone cinema toggle (0xE5), which
+ * older models expose instead of this picker.
+ */
+export enum UpmixItem {
+  NONE = 0x00,
+  CINEMA = 0x01,
+  GAME = 0x02,
+  MUSIC = 0x03,
 }
 
 /** ProtocolV2T1.h:755-768 (subset). */
@@ -316,6 +332,7 @@ export enum FunctionTypeT1 {
   CONNECTION_MODE_SOUND_QUALITY_CONNECTION_QUALITY = 0xe1,
   UPSCALING_AUTO_OFF = 0xe2,
   UPMIX_CINEMA = 0xe5,
+  UPMIX_SERIES = 0xec,
   LISTENING_OPTION = 0xe6,
   BGM_MODE_SMALL_MIDDLE_LARGE_AND_ERRORCODE = 0xeb,
   PLAYBACK_CONTROL_BY_WEARING_REMOVING_HEADPHONE_ON_OFF = 0xf1,

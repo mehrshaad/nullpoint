@@ -351,6 +351,7 @@ export function Dashboard({
           autoPowerOff={state.autoPowerOff}
           bgmMode={state.bgmMode}
           upmixCinema={state.upmixCinema}
+          upmixSeries={state.upmixSeries}
           onConnectionModeChange={(mode) => void headphones.setConnectionMode(mode)}
           onUpscalingChange={(value) => void headphones.setUpscaling(value)}
           onSpeakToChatChange={(next) => void headphones.setSpeakToChat(next)}
@@ -361,6 +362,7 @@ export function Dashboard({
           onAutoPowerOffChange={(value) => void headphones.setAutoPowerOff(value)}
           onBgmModeChange={(next) => void headphones.setBgmMode(next)}
           onUpmixCinemaChange={(enabled) => void headphones.setUpmixCinema(enabled)}
+          onUpmixSeriesChange={(item) => void headphones.setUpmixSeries(item)}
         />
 
         {/* Flows into the second column beside SOUND & SPEECH rather than spanning the width:

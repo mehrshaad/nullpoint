@@ -7,6 +7,7 @@ import {
   EnableDisable,
   PriorMode,
   RoomSize,
+  UpmixItem,
   UpscalingTypeAutoOff,
 } from "../constants.js";
 
@@ -49,6 +50,14 @@ export function encodeSetBgmMode(
   ]);
 }
 
+/**
+ * Which spatial upmix is active, on headsets that offer the picker rather than the single
+ * cinema toggle. ProtocolV2T1.h:5489-5504 — `[command][UPMIX_SERIES][item]`.
+ */
+export function encodeSetUpmixSeries(item: UpmixItem): Uint8Array {
+  return Uint8Array.from([CommandT1.AUDIO_SET_PARAM, AudioInquiredType.UPMIX_SERIES, item]);
+}
+
 /** Cinema upmix. ProtocolV2T1.h:5394-5410 — `[command][inquiredType][onOff]`. */
 export function encodeSetUpmixCinema(enabled: boolean): Uint8Array {
   return Uint8Array.from([
@@ -69,6 +78,7 @@ export function decodeAudioParam(
   | { type: "upscaling"; value: UpscalingTypeAutoOff }
   | { type: "bgmMode"; value: BgmModeState }
   | { type: "upmixCinema"; value: boolean }
+  | { type: "upmixSeries"; value: UpmixItem }
   | null {
   const value = payload[2];
   if (value === undefined) return null;
@@ -87,6 +97,8 @@ export function decodeAudioParam(
     }
     case AudioInquiredType.UPMIX_CINEMA:
       return { type: "upmixCinema", value: value === EnableDisable.ENABLE };
+    case AudioInquiredType.UPMIX_SERIES:
+      return { type: "upmixSeries", value: value as UpmixItem };
     default:
       return null;
   }

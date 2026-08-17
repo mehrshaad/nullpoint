@@ -5,6 +5,7 @@ import {
   ModeOutTime,
   PriorMode,
   RoomSize,
+  UpmixItem,
   UpscalingTypeAutoOff,
   type BgmModeState,
   type SpeakToChatState,
@@ -94,6 +95,7 @@ export function SoundSettings({
   autoPowerOff,
   bgmMode,
   upmixCinema,
+  upmixSeries,
   onConnectionModeChange,
   onUpscalingChange,
   onSpeakToChatChange,
@@ -104,6 +106,7 @@ export function SoundSettings({
   onAutoPowerOffChange,
   onBgmModeChange,
   onUpmixCinemaChange,
+  onUpmixSeriesChange,
 }: {
   connectionMode: PriorMode | null;
   upscaling: UpscalingTypeAutoOff | null;
@@ -113,6 +116,7 @@ export function SoundSettings({
   autoPowerOff: AutoPowerOff | null;
   bgmMode: BgmModeState | null;
   upmixCinema: boolean | null;
+  upmixSeries: UpmixItem | null;
   onConnectionModeChange: (mode: PriorMode) => void;
   onUpscalingChange: (value: UpscalingTypeAutoOff) => void;
   onSpeakToChatChange: (next: SpeakToChatState) => void;
@@ -125,6 +129,7 @@ export function SoundSettings({
   onAutoPowerOffChange: (value: AutoPowerOff) => void;
   onBgmModeChange: (next: BgmModeState) => void;
   onUpmixCinemaChange: (enabled: boolean) => void;
+  onUpmixSeriesChange: (item: UpmixItem) => void;
 }) {
   const anything =
     connectionMode !== null ||
@@ -134,7 +139,8 @@ export function SoundSettings({
     headGesture !== null ||
     autoPowerOff !== null ||
     bgmMode !== null ||
-    upmixCinema !== null;
+    upmixCinema !== null ||
+    upmixSeries !== null;
   if (!anything) return null;
 
   return (
@@ -183,7 +189,7 @@ export function SoundSettings({
 
       {bgmMode && (
         <>
-          <Row label="Background music" hint="Places the music around you, not in your head">
+          <Row label="Spatial music" hint="Plays it around you, like a room — not between your ears">
             <Switch
               checked={bgmMode.enabled}
               onChange={(enabled) => onBgmModeChange({ ...bgmMode, enabled })}
@@ -191,7 +197,7 @@ export function SoundSettings({
             />
           </Row>
           <Collapse open={bgmMode.enabled} parentGap={16}>
-            <Row label="Room size" hint="How far away it sounds">
+            <Row label="Room size" hint="How far away the room feels">
               <Segmented
                 ariaLabel="Room size"
                 value={bgmMode.room}
@@ -208,8 +214,24 @@ export function SoundSettings({
       )}
 
       {upmixCinema !== null && (
-        <Row label="Cinema upmix" hint="Widens stereo for film soundtracks">
+        <Row label="Cinema upmix" hint="Widens a stereo mix for film soundtracks">
           <Switch checked={upmixCinema} onChange={onUpmixCinemaChange} ariaLabel="Cinema upmix" />
+        </Row>
+      )}
+
+      {upmixSeries !== null && (
+        <Row label="Spatial upmix" hint="Spreads a stereo mix out around you">
+          <Segmented
+            ariaLabel="Spatial upmix"
+            value={upmixSeries}
+            onChange={onUpmixSeriesChange}
+            options={[
+              { value: UpmixItem.NONE, label: "OFF" },
+              { value: UpmixItem.MUSIC, label: "MUSIC" },
+              { value: UpmixItem.CINEMA, label: "CINEMA" },
+              { value: UpmixItem.GAME, label: "GAME" },
+            ]}
+          />
         </Row>
       )}
 

@@ -21,6 +21,7 @@ import {
   PowerInquiredType,
   PriorMode,
   SystemInquiredType,
+  UpmixItem,
   UpscalingTypeAutoOff,
 } from "./constants.js";
 import { FrameReassembler, packageDataForBt, type DecodedFrame } from "./framing.js";
@@ -59,6 +60,8 @@ export interface HeadphonesState {
   /** Background music mode — music placed around you rather than in your head. */
   bgmMode: Audio.BgmModeState | null;
   upmixCinema: boolean | null;
+  /** The spatial upmix picker, on headsets that offer it instead of the cinema toggle. */
+  upmixSeries: UpmixItem | null;
   /** Nod to accept a call, shake to decline. */
   headGesture: boolean | null;
   /** Which codec is carrying audio right now. */
@@ -99,6 +102,7 @@ export type HeadphonesEvent =
         | "autoPowerOff"
         | "bgmMode"
         | "upmixCinema"
+        | "upmixSeries"
         | "playback"
         | "volume";
     }
@@ -160,6 +164,7 @@ export class Headphones {
     autoPowerOff: null,
     bgmMode: null,
     upmixCinema: null,
+    upmixSeries: null,
     headGesture: null,
     codec: null,
     playback: null,
@@ -324,6 +329,13 @@ export class Headphones {
         CommandT1.AUDIO_RET_PARAM
       );
     }
+    if (this.supports(FunctionTypeT1.UPMIX_SERIES)) {
+      await ask(
+        "spatial upmix",
+        Audio.encodeGetAudioParam(AudioInquiredType.UPMIX_SERIES),
+        CommandT1.AUDIO_RET_PARAM
+      );
+    }
     if (this.supports(FunctionTypeT1.CODEC_INDICATOR)) {
       await ask("the codec in use", Playback.encodeGetCodec(), CommandT1.COMMON_RET_STATUS);
     }
@@ -363,6 +375,11 @@ export class Headphones {
 
   async setUpmixCinema(enabled: boolean): Promise<void> {
     await this.writeSetting("upmixCinema", enabled, () => Audio.encodeSetUpmixCinema(enabled));
+  }
+
+  /** Which spatial upmix is active — none, cinema, game or music. */
+  async setUpmixSeries(item: UpmixItem): Promise<void> {
+    await this.writeSetting("upmixSeries", item, () => Audio.encodeSetUpmixSeries(item));
   }
 
   /**
@@ -467,6 +484,7 @@ export class Headphones {
       | "autoPowerOff"
       | "bgmMode"
       | "upmixCinema"
+      | "upmixSeries"
       | "volume",
   >(
     key: K,
@@ -1012,6 +1030,7 @@ export class Headphones {
         if (param.type === "connectionMode") this.state.connectionMode = param.value;
         else if (param.type === "upscaling") this.state.upscaling = param.value;
         else if (param.type === "bgmMode") this.state.bgmMode = param.value;
+        else if (param.type === "upmixSeries") this.state.upmixSeries = param.value;
         else this.state.upmixCinema = param.value;
         this.emit({ type: "settings" });
         break;

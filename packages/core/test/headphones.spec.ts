@@ -23,6 +23,7 @@ import {
   FunctionTypeT1,
   PriorMode,
   UpscalingTypeAutoOff,
+  UpmixItem,
   DetectSensitivity,
   ModeOutTime,
   DataType,
@@ -83,7 +84,14 @@ function createFakeDevice({
   table2 = false,
   noiseAdaptation = false,
   extras = false,
-}: { table2?: boolean; noiseAdaptation?: boolean; extras?: boolean } = {}) {
+  upmixSeries = false,
+}: {
+  table2?: boolean;
+  noiseAdaptation?: boolean;
+  extras?: boolean;
+  /** The spatial-upmix picker, which some headsets offer in place of the cinema toggle. */
+  upmixSeries?: boolean;
+} = {}) {
   const ncAsmType = noiseAdaptation
     ? NcAsmInquiredType.MODE_NC_ASM_DUAL_NC_MODE_SWITCH_AND_ASM_SEAMLESS_NA
     : NcAsmInquiredType.MODE_NC_ASM_DUAL_NC_MODE_SWITCH_AND_ASM_SEAMLESS;
@@ -108,6 +116,7 @@ function createFakeDevice({
     bgmEnabled: false,
     bgmRoom: RoomSize.MIDDLE as number,
     upmixCinema: false,
+    upmixSeries: UpmixItem.NONE as number,
     codec: AudioCodec.LDAC as number,
     playing: false,
     volume: 12,
@@ -236,6 +245,7 @@ function createFakeDevice({
                 FunctionTypeT1.PLAYBACK_CONTROLLER_WITH_CALL_VOLUME_ADJUSTMENT,
               ]
             : []),
+          ...(upmixSeries ? [FunctionTypeT1.UPMIX_SERIES] : []),
         ];
         replies.push(
           mdr([
@@ -262,6 +272,10 @@ function createFakeDevice({
           );
           break;
         }
+        if (type === AudioInquiredType.UPMIX_SERIES) {
+          replies.push(mdr([CommandT1.AUDIO_RET_PARAM, type, state.upmixSeries]));
+          break;
+        }
         if (type === AudioInquiredType.UPMIX_CINEMA) {
           replies.push(
             mdr([
@@ -286,6 +300,8 @@ function createFakeDevice({
         if (type === AudioInquiredType.BGM_MODE_AND_ERRORCODE || type === AudioInquiredType.BGM_MODE) {
           state.bgmEnabled = payload[2] === EnableDisable.ENABLE;
           state.bgmRoom = payload[3]!;
+        } else if (type === AudioInquiredType.UPMIX_SERIES) {
+          state.upmixSeries = payload[2]!;
         } else if (type === AudioInquiredType.UPMIX_CINEMA) {
           state.upmixCinema = payload[2] === EnableDisable.ENABLE;
         } else if (type === AudioInquiredType.CONNECTION_MODE) {
@@ -1048,6 +1064,39 @@ describe("Headphones.connect() over a fake device", () => {
     expect(state.bgmMode).toEqual({ enabled: false, room: RoomSize.MIDDLE });
     expect(state.upmixCinema).toBe(false);
     expect(state.headGesture).toBe(false);
+  }, 30_000);
+
+  it("leaves the spatial upmix picker null on a headset that only has the cinema toggle", async () => {
+    // The two are alternatives, and an XM6 has the toggle. Asking a headset for a setting it
+    // never claimed gets no answer, so the control has to stay hidden rather than appear empty.
+    const transport = new LoopbackTransport(createFakeDevice({ extras: true }));
+    const hp = new Headphones(transport);
+    const state = await hp.connect();
+
+    expect(state.upmixSeries).toBeNull();
+    const asked = transport.sent
+      .map((f) => decodeFrameBody(f.subarray(1, f.length - 1)))
+      .filter((f) => f.payload[0] === CommandT1.AUDIO_GET_PARAM)
+      .map((f) => f.payload[1]);
+    expect(asked).not.toContain(AudioInquiredType.UPMIX_SERIES);
+  }, 30_000);
+
+  it("reads and writes the spatial upmix picker when the headset advertises it", async () => {
+    const transport = new LoopbackTransport(createFakeDevice({ extras: true, upmixSeries: true }));
+    const hp = new Headphones(transport);
+    const state = await hp.connect();
+
+    expect(state.upmixSeries).toBe(UpmixItem.NONE);
+
+    await hp.setUpmixSeries(UpmixItem.MUSIC);
+    expect(hp.state.upmixSeries).toBe(UpmixItem.MUSIC);
+
+    const sets = transport.sent
+      .map((f) => decodeFrameBody(f.subarray(1, f.length - 1)))
+      .filter((f) => f.payload[0] === CommandT1.AUDIO_SET_PARAM)
+      .filter((f) => f.payload[1] === AudioInquiredType.UPMIX_SERIES);
+    expect(sets).toHaveLength(1);
+    expect(sets[0]!.payload[2]).toBe(UpmixItem.MUSIC);
   }, 30_000);
 
   it("asks for background music on the variant the headset advertises", async () => {
