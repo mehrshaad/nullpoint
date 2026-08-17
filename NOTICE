@@ -50,6 +50,28 @@ WH-1000XM5 / WH-1000XM6 / Protocol V2 were derived from this fork's
 
 ===============================================================================
 
+The platform marks on the download page (Windows, Apple, Linux, and the globe)
+come from the Font Awesome Free icon set, by way of the `react-icons` package.
+
+--------------------------------------------------------------------------
+Font Awesome Free
+https://fontawesome.com
+Copyright (c) Fonticons, Inc.
+
+Icons are licensed under CC BY 4.0:
+https://creativecommons.org/licenses/by/4.0/
+
+--------------------------------------------------------------------------
+react-icons
+https://github.com/react-icons/react-icons
+MIT License. Individual icon sets keep their own licenses, as above.
+
+===============================================================================
+
 This is an independent, unofficial project. It is not affiliated with,
 endorsed by, or connected to Sony Group Corporation. Product and model names
 (e.g. "WH-1000XM6") are used solely to identify compatible hardware.
+
+The Windows and Apple marks are trademarks of Microsoft Corporation and Apple
+Inc. respectively. They are used here only to identify which download is for
+which operating system, and imply no affiliation or endorsement.

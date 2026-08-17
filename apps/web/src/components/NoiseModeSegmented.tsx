@@ -14,6 +14,19 @@ function tint(mode: NoiseMode): string {
   return "var(--fg2)";
 }
 
+/**
+ * The chosen mode is a solid button raised out of the track, not an outlined cell. Mixing the
+ * tint into the panel colour keeps it opaque enough to read as a surface sitting on top, while
+ * the unselected modes stay flat and borderless so there is something for it to sit above.
+ */
+function selectedSurface(mode: NoiseMode): string {
+  if (mode === "ambient") return "color-mix(in srgb, var(--amber-soft) 70%, var(--panel))";
+  if (mode === "anc") return "color-mix(in srgb, var(--accent-soft) 70%, var(--panel))";
+  return "var(--panel2)";
+}
+
+const RAISED_SHADOW = "0 6px 14px -8px rgb(0 0 0 / 0.85), 0 1px 0 0 rgb(255 255 255 / 0.04) inset";
+
 /** design/Dashboard.dc.html §1e "NoiseModeSegmented" — full geometry/state/keyboard spec there. */
 export function NoiseModeSegmented({ value, onChange }: { value: NoiseMode; onChange: (mode: NoiseMode) => void }) {
   return (
@@ -66,10 +79,12 @@ export function NoiseModeSegmented({ value, onChange }: { value: NoiseMode; onCh
               cursor: "pointer",
               outline: "none",
               userSelect: "none",
-              background: on ? (m.id === "ambient" ? "var(--amber-soft)" : m.id === "anc" ? "var(--accent-soft)" : "var(--panel2)") : "transparent",
-              border: `1px solid ${on ? c : "transparent"}`,
+              background: on ? selectedSurface(m.id) : "transparent",
               color: on ? c : "var(--fg3)",
-              transition: "background .16s ease, color .16s ease, border-color .16s ease",
+              transform: on ? "translateY(-1px)" : "none",
+              boxShadow: on ? RAISED_SHADOW : "none",
+              transition:
+                "background .2s ease, color .2s ease, transform .2s ease, box-shadow .2s ease",
             }}
           >
             <div style={{ fontWeight: 600, fontSize: 12 }}>{m.label}</div>

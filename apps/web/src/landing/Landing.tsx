@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { FaApple, FaGlobe, FaLinux, FaWindows } from "react-icons/fa";
+import type { IconType } from "react-icons";
 import {
   AmbientSoundMode,
   DataType,
@@ -17,55 +19,27 @@ const LATEST_RELEASE = `${REPO}/releases/latest`;
 type Platform = "windows" | "macos" | "linux" | "mobile" | "unknown";
 
 /**
- * Platform marks, drawn as plain geometry rather than shipped brand assets: a four-pane grid
- * for Windows, an apple silhouette for macOS, a monitor for everything else. They inherit the
- * button's text colour, so they stay legible whichever way the palette goes.
+ * Platform marks, from the Font Awesome brand set via react-icons so Windows and Apple are the
+ * same hand rather than two of mine. Bundled with the app rather than fetched: this ships in
+ * Electron and has to work with no network, the same reason the fonts are self-hosted.
+ *
+ * They inherit the button's text colour, so they stay legible whichever way the palette goes,
+ * and they identify which build a download is for — nothing more.
  */
+const OS_GLYPHS: Record<Platform, IconType> = {
+  windows: FaWindows,
+  macos: FaApple,
+  linux: FaLinux,
+  // No mark of their own: the web is where those visitors are already standing. A globe from
+  // the same set keeps every mark one weight and one hand — an outline among filled glyphs
+  // reads as a different icon set that wandered in.
+  mobile: FaGlobe,
+  unknown: FaGlobe,
+};
+
 function OsMark({ platform }: { platform: Platform }) {
-  const glyph = {
-    windows: (
-      <>
-        <rect x="1" y="1" width="6.4" height="6.4" rx="0.6" />
-        <rect x="8.6" y="1" width="6.4" height="6.4" rx="0.6" />
-        <rect x="1" y="8.6" width="6.4" height="6.4" rx="0.6" />
-        <rect x="8.6" y="8.6" width="6.4" height="6.4" rx="0.6" />
-      </>
-    ),
-    macos: (
-      <>
-        {/* body */}
-        <path d="M12.6 11.3c-.5 1.2-1.3 2.6-2.2 2.6-.8 0-1.1-.5-2.1-.5s-1.3.5-2.1.5c-1 0-2.3-2-2.8-3.7-.5-1.9-.1-4 1.6-4.4 1-.2 1.6.4 2.2.4.7 0 1.2-.5 2.3-.4.9.1 1.6.5 2 1.2-1.6 1-1.4 3.2.1 4.3z" />
-        {/* leaf */}
-        <path d="M9.6 4.4c.4-.6.3-1.4.2-1.7-.7.1-1.5.5-1.9 1.1-.4.5-.4 1.2-.3 1.6.6 0 1.5-.4 2-1z" />
-      </>
-    ),
-    linux: null,
-    mobile: null,
-    unknown: null,
-  }[platform];
-
-  // Fallback for platforms without a mark of their own: a plain display.
-  const fallback = (
-    <>
-      <rect x="1.2" y="2" width="13.6" height="9.4" rx="1.4" />
-      <path d="M5.6 14h4.8" />
-    </>
-  );
-  const filled = platform === "windows" || platform === "macos";
-
-  return (
-    <svg
-      className="lp-btn-os"
-      viewBox="0 0 16 16"
-      fill={filled ? "currentColor" : "none"}
-      stroke={filled ? "none" : "currentColor"}
-      strokeWidth={1.4}
-      strokeLinecap="round"
-      aria-hidden="true"
-    >
-      {glyph ?? fallback}
-    </svg>
-  );
+  const Icon = OS_GLYPHS[platform];
+  return <Icon className="lp-btn-os" aria-hidden="true" />;
 }
 
 /**
