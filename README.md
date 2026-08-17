@@ -12,7 +12,7 @@ Sony's official "Sound Connect" app (Android/iOS only) talks to the headphones o
 
 **Features:** device detection, live battery, noise-canceling / ambient-sound mode with a continuous ambient level slider and focus-on-voice, and the equalizer with Sony's presets. Both equalizer layouts are supported — Clear Bass plus 5 bands, and the 10-band graphic EQ newer firmware reports. Changes made on the headphones themselves, or from your phone, appear in the app live.
 
-**Playback and volume** for whichever device is playing, with a readout of the codec actually carrying audio. **Unlimited named EQ curves**, because the headset forgets a custom curve the moment you pick a preset. A **device panel** listing everything the headphones are paired with — which are connected, which one has the audio, and a button to connect or disconnect each. And **auto ambient level, Speak-to-Chat, DSEE Extreme, background music, cinema upmix, pause-on-removal, head gestures, auto power off and power off**, each appearing only when your headphones report it and left out entirely when they don't. Settings shows exactly what yours reported. The desktop app lives in the tray, can start at login without opening a window, and reconnects on its own. Confirmed on a WH-1000XM6 (firmware 3.1.5) and a WH-CH720N.
+**Playback and volume** for whichever device is playing, with a readout of the codec actually carrying audio. **Unlimited named EQ curves**, because the headset forgets a custom curve the moment you pick a preset. A **device panel** listing everything the headphones are paired with — which are connected, which one has the audio, and a button to connect or disconnect each. And **auto ambient level, Speak-to-Chat, DSEE Extreme, background music, cinema upmix, pause-on-removal, head gestures, auto power off and power off**, each appearing only when your headphones report it and left out entirely when they don't. Settings shows exactly what yours reported. The desktop app lives in the tray, can start at login without opening a window, and reconnects on its own — with **global hotkeys** and **noise-control switching from the tray menu**, so changing mode never needs a window. Speak-to-Chat can be **locked**, for headsets that keep switching it back on. Settings also carries a **protocol inspector** showing every frame on the wire, and a **binaural demo** that renders its own audio through an HRTF — Nullpoint never touches your music. Confirmed on a WH-1000XM6 (firmware 3.1.5) and a WH-CH720N.
 
 ## Screenshots
 
@@ -47,7 +47,8 @@ pnpm run test          # protocol test suite
 pnpm run typecheck
 
 pnpm --filter @ssc/desktop run package:win   # build the Windows installer
-node scripts/generate-icons.mjs              # regenerate app/tray/PWA icons
+pnpm --filter @ssc/desktop run icons        # regenerate every app/tray/PWA icon
+pnpm --filter @ssc/desktop run art          # regenerate the installer artwork
 ```
 
 ## Architecture
@@ -66,7 +67,8 @@ apps/
   web/                    React PWA — landing page, the app, and its screens.
   desktop/                Electron shell wrapping apps/web: tray, launch-at-login,
                            automatic serial-port selection, packaging.
-scripts/                  icon generation (PNG/ICO encoded directly, no image tooling)
+scripts/                  icon generation: Chromium draws the vector, Pillow resamples
+                           and packs the .ico containers by hand
 ```
 
 Two details worth knowing if you work on this:
@@ -92,8 +94,8 @@ The one constraint is that the headphones hand out that settings channel to **on
 - Only the single-battery reading is wired up, so earbuds won't show per-bud or case levels.
 - Every control appears only if your headphones report the matching capability. On a WH-1000XM6 that means no connection-quality setting, because it doesn't advertise one — Settings shows exactly what yours reported.
 - Devices that are paired but not currently connected don't report their device type, so their icon is guessed from the device name.
-- These headphones hold **two** devices at once, so connecting a third from the device panel disconnects one of the existing pair. If both slots are already full the connection is simply refused, currently without saying so.
-- The connected-device panel is built but unverified on hardware — it appears only if your headphones report Protocol V2 Table 2 support, and silently doesn't if they don't.
+- These headphones hold **two** devices at once, so connecting a third from the device panel disconnects one of the existing pair. The panel says so when both slots are in use, and a refused switch reports why.
+- The connected-device panel appears only if your headphones report Protocol V2 Table 2 support, and is silently absent if they don't.
 - See [`PLAN.md`](./PLAN.md) for what's planned next, including Adaptive Sound Control.
 - Confirmed on **WH-1000XM6** (firmware 3.1.5) and **WH-CH720N**. Other Sony models use the same protocol and should work, but are unverified — [reports welcome](https://github.com/mehrshaad/nullpoint/issues).
 
