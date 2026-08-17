@@ -13,7 +13,7 @@ import { useEffect, useRef, useState } from "react";
  * follow. The position here is the one you set.
  *
  * The point is comparison — this is what spatialisation sounds like when software does it, next
- * to what your headphones do themselves in Spatial music.
+ * to what your headphones do themselves in Background music.
  */
 export function SpatialDemo() {
   const [playing, setPlaying] = useState(false);

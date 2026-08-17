@@ -189,7 +189,7 @@ export function SoundSettings({
 
       {bgmMode && (
         <>
-          <Row label="Spatial music" hint="Plays it around you, like a room — not between your ears">
+          <Row label="Background music" hint="Places the music around you, not in your head">
             <Switch
               checked={bgmMode.enabled}
               onChange={(enabled) => onBgmModeChange({ ...bgmMode, enabled })}
@@ -197,7 +197,7 @@ export function SoundSettings({
             />
           </Row>
           <Collapse open={bgmMode.enabled} parentGap={16}>
-            <Row label="Room size" hint="How far away the room feels">
+            <Row label="Room size" hint="How far away it sounds">
               <Segmented
                 ariaLabel="Room size"
                 value={bgmMode.room}
