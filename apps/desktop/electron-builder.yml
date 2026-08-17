@@ -57,24 +57,27 @@ mac:
   # ad-hoc signs the bundle, without which Apple Silicon refuses to launch it at all.
   identity: null
 
-# The drag-to-install window. Coordinates are the centres of the two icons, and the background
-# art is drawn to put its arrow between them at exactly this geometry — change one and the
-# other stops lining up.
-dmg:
-  title: Nullpoint ${version}
-  background: build/dmg/background.png
-  window:
-    width: 540
-    height: 380
-  iconSize: 96
-  contents:
-    - x: 150
-      y: 232
-      type: file
-    - x: 390
-      y: 232
-      type: link
-      path: /Applications
+# The styled drag-to-install window is held back until it can be tested on a Mac.
+#
+# Setting `background` or `contents` makes electron-builder lay the window out by driving Finder
+# over AppleScript. On a headless CI runner that leaves the mounted volume busy, and the build
+# dies on `hdiutil detach` after six retries — every release before this one produced its disk
+# images precisely because there was no dmg block here.
+#
+# The artwork is generated and waiting in build/dmg/ (background.png and its @2x). To restore,
+# put this back and verify it on real hardware, not in CI:
+#
+#   dmg:
+#     title: Nullpoint ${version}
+#     background: build/dmg/background.png
+#     window: { width: 540, height: 380 }
+#     iconSize: 96
+#     contents:
+#       - { x: 150, y: 232, type: file }
+#       - { x: 390, y: 232, type: link, path: /Applications }
+#
+# The arrow in the background art is drawn to sit between those two icon centres, so the
+# coordinates and the image have to change together.
 
 afterPack: scripts/adhoc-sign.cjs
 
