@@ -1,6 +1,6 @@
 {
   "name": "@ssc/web",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "description": "Nullpoint web app (PWA) — Chrome/Edge desktop only, Web Serial transport",
   "license": "Apache-2.0",
