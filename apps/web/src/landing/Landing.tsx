@@ -10,7 +10,6 @@ import {
   packageDataForBt,
   type NoiseMode,
 } from "@ssc/core";
-import xm6Photo from "./xm6.png";
 import { DeviceArt } from "../components/DeviceArt.js";
 import "./landing.css";
 
@@ -309,18 +308,16 @@ export function Landing() {
       </nav>
 
       <header className="lp-wrap lp-hero">
-        {/* Sits behind the copy and runs off the bottom of the hero, where the protocol panel
-            crops it. Decorative — the sentence beside it already says what the product is. */}
-        <div className="lp-device" aria-hidden="true">
-          <img
-            src={xm6Photo}
-            width={692}
-            height={1050}
-            alt=""
-            loading="eager"
-            decoding="async"
-          />
-        </div>
+        {/* The hero device is held back for now. Everything it needs is still here — the cut-out
+            at ./xm6.png and the .lp-device rules in landing.css, shadow and scroll drift
+            included. To bring it back, restore the import and this block:
+
+              <div className="lp-device" aria-hidden="true">
+                <img src={xm6Photo} width={692} height={1050} alt="" loading="eager" decoding="async" />
+              </div>
+
+            Deliberately not merely hidden with CSS: an unreferenced asset is left out of the
+            build entirely, so nothing ships to the site until it is wanted. */}
 
         <div className="lp-eyebrow lp-rise">
           <span>UNOFFICIAL CLIENT</span>
