@@ -146,6 +146,11 @@
   transition: transform 0.16s ease, filter 0.16s ease, background 0.16s ease;
 }
 
+/* Buttons are surfaces too — never underline their label on hover. */
+.lp-btn:hover {
+  text-decoration: none;
+}
+
 .lp-btn:active {
   transform: translateY(1px);
 }
@@ -157,6 +162,7 @@
 
 .lp-btn-primary:hover {
   filter: brightness(1.08);
+  transform: translateY(-1px);
 }
 
 .lp-btn-ghost {
@@ -166,6 +172,21 @@
 
 .lp-btn-ghost:hover {
   background: var(--panel2);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+}
+
+/* The OS mark sits with the label, sized to the cap height rather than the line box. */
+.lp-btn-os {
+  width: 15px;
+  height: 15px;
+  flex: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-btn,
+  .lp-btn-primary:hover {
+    transform: none;
+  }
 }
 
 .lp-cta-note {
@@ -404,18 +425,51 @@
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--panel);
-  transition: border-color 0.16s ease, background 0.16s ease;
+  transition: border-color 0.22s ease, background 0.22s ease, transform 0.22s ease,
+    box-shadow 0.22s ease;
 }
 
 .lp-dl-card[data-primary="true"] {
   border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
 }
 
+/* A card is a surface, not a sentence: it lifts toward the reader instead of underlining
+   every word inside it. The underline reset is on the card itself because the global a:hover
+   rule sets it there, and a descendant cannot remove an ancestor's decoration. */
 .lp-dl-card:hover {
   background: var(--panel2);
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px -14px rgb(0 0 0 / 0.7);
+  text-decoration: none;
+}
+
+/* The arrow leads the eye in the direction the card takes you. */
+.lp-dl-card:hover .lp-dl-action {
+  color: var(--accent);
+}
+
+.lp-dl-action {
+  transition: color 0.22s ease;
+}
+
+.lp-dl-card:active {
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-dl-card {
+    transition: border-color 0.22s ease, background 0.22s ease;
+  }
+  .lp-dl-card:hover {
+    transform: none;
+  }
 }
 
 .lp-dl-os {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 15px;
   font-weight: 600;
 }

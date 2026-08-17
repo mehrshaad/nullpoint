@@ -16,7 +16,7 @@ export function ConnectFailed({
   onRetry: () => void;
   onChooseAnother: () => void;
 }) {
-  const { headline, hint, detail } = describeConnectError(new Error(message));
+  const { headline, hint, steps, detail } = describeConnectError(new Error(message));
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "var(--bg)" }}>
@@ -60,6 +60,48 @@ export function ConnectFailed({
         >
           {hint}
         </div>
+
+        {/* Ordered by how often each one is the actual cause, so the first thing you read is
+            the first thing worth trying. */}
+        {steps && (
+          <ol
+            style={{
+              marginTop: 18,
+              maxWidth: 460,
+              width: "100%",
+              padding: 0,
+              listStyle: "none",
+              display: "flex",
+              flexDirection: "column",
+              gap: 1,
+              border: "1px solid var(--line)",
+              borderRadius: 10,
+              overflow: "hidden",
+              background: "var(--line)",
+            }}
+          >
+            {steps.map((step, i) => (
+              <li
+                key={step}
+                style={{
+                  display: "flex",
+                  gap: 11,
+                  padding: "11px 14px",
+                  background: "var(--panel)",
+                  fontSize: 12.5,
+                  lineHeight: 1.55,
+                  color: "var(--fg2)",
+                }}
+              >
+                <span className="mono" style={{ flex: "none", color: "var(--fg3)", fontSize: 11 }}>
+                  {i + 1}
+                </span>
+                <span>{step}</span>
+              </li>
+            ))}
+          </ol>
+        )}
+
         <div
           className="mono"
           style={{ marginTop: 14, fontSize: 10.5, color: "var(--fg3)", maxWidth: 520, textAlign: "center" }}

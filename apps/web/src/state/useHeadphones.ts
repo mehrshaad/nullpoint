@@ -7,14 +7,27 @@ import { WebSerialTransport } from "@ssc/transport-webserial";
  * "no port in the chooser" and "the headset refused the link" need completely different fixes,
  * so we never show a single canned explanation.
  */
-export function describeConnectError(err: unknown): { headline: string; hint: string; detail: string } {
+export interface ConnectErrorHelp {
+  headline: string;
+  hint: string;
+  /** Concrete things to try, most likely first. Rendered as a list, not prose. */
+  steps?: string[];
+  detail: string;
+}
+
+export function describeConnectError(err: unknown): ConnectErrorHelp {
   const detail = err instanceof Error ? err.message : String(err);
   const name = err instanceof Error ? err.name : "";
 
   if (/No port selected/i.test(detail) || name === "NotFoundError") {
     return {
       headline: "No headphones showed up",
-      hint: "Either the picker was dismissed, or Windows isn't offering the headset's control service. Make sure the headphones are connected (not just paired), then try again. Closing Sony's phone app can help — it can hold the control channel open.",
+      hint: "Either the picker was dismissed, or Windows isn't offering the headset's control service.",
+      steps: [
+        "Check the headphones are connected in your Bluetooth settings, not only paired.",
+        "Quit Nullpoint if it's running in your system tray, then try again.",
+        "Turn the headphones off and on if they've been idle.",
+      ],
       detail,
     };
   }
@@ -27,15 +40,26 @@ export function describeConnectError(err: unknown): { headline: string; hint: st
   }
   if (name === "NetworkError" || /already open|failed to open|access denied/i.test(detail)) {
     return {
-      headline: "Something else is holding the control link",
-      hint: "These headphones accept settings from one device at a time, even though they play audio from two. If they're also connected to your phone, disconnect them there and try again — Sony's app doesn't need to be open for the phone to be holding the link. A copy of Nullpoint still running in the tray will do the same.",
+      headline: "Something else is holding the settings channel",
+      // These are ordered by how often each one is actually the culprit — the copy of
+      // Nullpoint you forgot is in the tray beats the phone you're thinking of.
+      hint: "Your headphones take settings from one place at a time, even while playing audio to two devices.",
+      steps: [
+        "Quit Nullpoint in your system tray — the desktop app holds the channel while it runs.",
+        "Close any other Nullpoint tab or window.",
+        "Disconnect the headphones from your phone. Sony's app doesn't need to be open for the phone to be holding it.",
+      ],
       detail,
     };
   }
   if (/Timed out|No ACK/i.test(detail)) {
     return {
       headline: "The headphones didn't answer",
-      hint: "The link opened but the headset never replied. Power it off and on, then reconnect.",
+      hint: "The link opened but the headset never replied, which usually means it powered itself off.",
+      steps: [
+        "Press the power button on the headphones and wait for them to reconnect.",
+        "If they're already on, turn them off and on again.",
+      ],
       detail,
     };
   }

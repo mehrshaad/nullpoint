@@ -622,6 +622,28 @@ describe("Headphones.connect() over a fake device", () => {
     });
   });
 
+  it("still connects when the headset claims an extra and then won't answer about it", async () => {
+    // Losing the whole session over one optional setting costs the user every control rather
+    // than the one they cannot have.
+    const device = createFakeDevice({ extras: true });
+    const transport = new LoopbackTransport((sent) => {
+      const { payload } = decodeFrameBody(sent.subarray(1, sent.length - 1));
+      // Advertise Speak-to-Chat, then refuse to discuss it.
+      if (payload[0] === CommandT1.SYSTEM_GET_PARAM || payload[0] === CommandT1.SYSTEM_GET_EXT_PARAM) {
+        return [packageDataForBt(DataType.ACK, 0, Uint8Array.from([]))];
+      }
+      return device(sent);
+    });
+    const hp = new Headphones(transport);
+
+    const state = await hp.connect();
+
+    expect(state.modelName).toBe("WH-1000XM6");
+    expect(state.ncAsm).not.toBeNull();
+    expect(state.upscaling).toBe(UpscalingTypeAutoOff.OFF);
+    expect(state.speakToChat).toBeNull(); // the one that went unanswered, and only that one
+  }, 30_000);
+
   it("switches connection quality and DSEE", async () => {
     const transport = new LoopbackTransport(createFakeDevice({ extras: true }));
     const hp = new Headphones(transport);

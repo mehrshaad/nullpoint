@@ -1,6 +1,6 @@
 {
   "name": "@ssc/core",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "description": "Transport-agnostic Sony headphone control protocol (framing, payloads, device state)",
   "license": "Apache-2.0",

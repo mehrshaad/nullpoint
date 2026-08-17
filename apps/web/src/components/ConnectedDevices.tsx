@@ -94,6 +94,12 @@ function DeviceIcon({ kind, color }: { kind: PairedDeviceKind; color: string }) 
   );
 }
 
+/**
+ * Sony's multipoint carries two devices at once. Connecting a third really does connect it —
+ * and silently drops one of the pair — which is confusing enough to be worth stating in the UI.
+ */
+const MULTIPOINT_SLOTS = 2;
+
 export function ConnectedDevices({
   devices,
   onSetConnection,
@@ -106,6 +112,9 @@ export function ConnectedDevices({
   // failure on one device doesn't blank out the rest of the list.
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<{ address: string; message: string } | null>(null);
+
+  const connectedCount = devices.filter((d) => d.connected).length;
+  const full = connectedCount >= MULTIPOINT_SLOTS;
 
   async function toggle(device: PairedDevice) {
     if (!onSetConnection || pending) return;
@@ -135,12 +144,27 @@ export function ConnectedDevices({
         background: "var(--panel)",
       }}
     >
-      <div
-        className="mono"
-        style={{ fontWeight: 600, fontSize: 11, letterSpacing: "0.14em", color: "var(--fg3)", height: 16 }}
-      >
-        CONNECTED TO
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
+        <div
+          className="mono"
+          style={{ fontWeight: 600, fontSize: 11, letterSpacing: "0.14em", color: "var(--fg3)" }}
+        >
+          CONNECTED TO
+        </div>
+        {devices.length > 0 && (
+          <div className="mono" style={{ fontSize: 10, color: "var(--fg3)" }}>
+            {connectedCount} OF {MULTIPOINT_SLOTS} SLOTS
+          </div>
+        )}
       </div>
+
+      {/* Connecting a device when both slots are taken silently drops one of the pair. Saying
+          so up front is the difference between a deliberate swap and a button that looks broken. */}
+      {full && (
+        <div style={{ fontSize: 12, lineHeight: 1.5, color: "var(--fg3)", marginTop: -4 }}>
+          Both slots are in use. Connecting another device disconnects one of these.
+        </div>
+      )}
 
       {devices.length === 0 ? (
         <div style={{ fontSize: 12.5, color: "var(--fg3)" }}>
@@ -250,7 +274,7 @@ export function ConnectedDevices({
                       opacity: pending && !busy ? 0.4 : 1,
                     }}
                   >
-                    {busy ? "…" : device.connected ? "DISCONNECT" : "CONNECT"}
+                    {busy ? "…" : device.connected ? "DISCONNECT" : full ? "SWAP IN" : "CONNECT"}
                   </button>
                 )}
               </div>

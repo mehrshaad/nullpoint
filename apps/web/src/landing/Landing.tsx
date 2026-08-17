@@ -17,6 +17,58 @@ const LATEST_RELEASE = `${REPO}/releases/latest`;
 type Platform = "windows" | "macos" | "linux" | "mobile" | "unknown";
 
 /**
+ * Platform marks, drawn as plain geometry rather than shipped brand assets: a four-pane grid
+ * for Windows, an apple silhouette for macOS, a monitor for everything else. They inherit the
+ * button's text colour, so they stay legible whichever way the palette goes.
+ */
+function OsMark({ platform }: { platform: Platform }) {
+  const glyph = {
+    windows: (
+      <>
+        <rect x="1" y="1" width="6.4" height="6.4" rx="0.6" />
+        <rect x="8.6" y="1" width="6.4" height="6.4" rx="0.6" />
+        <rect x="1" y="8.6" width="6.4" height="6.4" rx="0.6" />
+        <rect x="8.6" y="8.6" width="6.4" height="6.4" rx="0.6" />
+      </>
+    ),
+    macos: (
+      <>
+        {/* body */}
+        <path d="M12.6 11.3c-.5 1.2-1.3 2.6-2.2 2.6-.8 0-1.1-.5-2.1-.5s-1.3.5-2.1.5c-1 0-2.3-2-2.8-3.7-.5-1.9-.1-4 1.6-4.4 1-.2 1.6.4 2.2.4.7 0 1.2-.5 2.3-.4.9.1 1.6.5 2 1.2-1.6 1-1.4 3.2.1 4.3z" />
+        {/* leaf */}
+        <path d="M9.6 4.4c.4-.6.3-1.4.2-1.7-.7.1-1.5.5-1.9 1.1-.4.5-.4 1.2-.3 1.6.6 0 1.5-.4 2-1z" />
+      </>
+    ),
+    linux: null,
+    mobile: null,
+    unknown: null,
+  }[platform];
+
+  // Fallback for platforms without a mark of their own: a plain display.
+  const fallback = (
+    <>
+      <rect x="1.2" y="2" width="13.6" height="9.4" rx="1.4" />
+      <path d="M5.6 14h4.8" />
+    </>
+  );
+  const filled = platform === "windows" || platform === "macos";
+
+  return (
+    <svg
+      className="lp-btn-os"
+      viewBox="0 0 16 16"
+      fill={filled ? "currentColor" : "none"}
+      stroke={filled ? "none" : "currentColor"}
+      strokeWidth={1.4}
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
+      {glyph ?? fallback}
+    </svg>
+  );
+}
+
+/**
  * Which download to put in front of the visitor. `userAgentData` is the modern, non-frozen
  * source and is checked first; the user-agent string is the fallback for Safari and Firefox.
  *
@@ -296,6 +348,7 @@ export function Landing() {
 
         <div className="lp-cta-row lp-rise" style={{ animationDelay: "0.14s" }}>
           <a className="lp-btn lp-btn-primary" href={LATEST_RELEASE}>
+            <OsMark platform={platform} />
             {cta.label}
           </a>
           {cta.browserButton && (
@@ -336,7 +389,10 @@ export function Landing() {
           {/* The visitor's own platform is the highlighted card, so the right one is obvious
               without reading all three. */}
           <a className="lp-dl-card" data-primary={platform === "windows"} href={LATEST_RELEASE}>
-            <div className="lp-dl-os">Windows</div>
+            <div className="lp-dl-os">
+              <OsMark platform="windows" />
+              Windows
+            </div>
             <div className="lp-dl-meta">INSTALLER · 64-BIT</div>
             <p className="lp-dl-body">
               The full desktop app. Sits in the tray, can start at login, and picks your headset
@@ -346,7 +402,10 @@ export function Landing() {
           </a>
 
           <a className="lp-dl-card" data-primary={platform === "macos"} href={LATEST_RELEASE}>
-            <div className="lp-dl-os">macOS</div>
+            <div className="lp-dl-os">
+              <OsMark platform="macos" />
+              macOS
+            </div>
             <div className="lp-dl-meta">APPLE SILICON · INTEL</div>
             <p className="lp-dl-body">
               The same app, living in the menu bar. Ad-hoc signed rather than notarized, so
@@ -360,7 +419,10 @@ export function Landing() {
             data-primary={platform === "linux" || platform === "unknown"}
             href="/app"
           >
-            <div className="lp-dl-os">Browser</div>
+            <div className="lp-dl-os">
+              <OsMark platform="unknown" />
+              Browser
+            </div>
             <div className="lp-dl-meta">CHROME · EDGE · OPERA · ARC</div>
             <p className="lp-dl-body">
               Nothing to install. Needs a Chromium browser on desktop, because Safari and Firefox

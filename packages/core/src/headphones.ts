@@ -190,6 +190,9 @@ export class Headphones {
     await this.request(DataType.DATA_MDR, NcAsm.encodeGetNcAsm(this.ncAsmVariant), CommandT1.NCASM_RET_PARAM);
     await this.request(DataType.DATA_MDR, Eq.encodeGetEq(), CommandT1.EQEBB_RET_PARAM);
 
+    // Optional extras must never be able to fail the connection. A headset that lists a
+    // capability and then declines to answer the question about it would otherwise take the
+    // whole session down, costing the user every control rather than the one they can't have.
     await this.readExtraSettings();
 
     this.startBatteryRefresh();
@@ -213,31 +216,32 @@ export class Headphones {
    * `state.<setting>` stays null — which is how the UI knows not to draw the control.
    */
   private async readExtraSettings(): Promise<void> {
+    /** One optional question. Left unanswered, the setting simply stays null. */
+    const ask = async (label: string, data: Uint8Array, expect: CommandT1): Promise<void> => {
+      try {
+        await this.request(DataType.DATA_MDR, data, expect);
+      } catch (err) {
+        console.warn(`[ssc/core] the headset claims ${label} but did not answer:`, err);
+      }
+    };
+
     if (this.supports(FunctionTypeT1.CONNECTION_MODE_SOUND_QUALITY_CONNECTION_QUALITY)) {
-      await this.request(
-        DataType.DATA_MDR,
+      await ask(
+        "connection quality",
         Audio.encodeGetAudioParam(AudioInquiredType.CONNECTION_MODE),
         CommandT1.AUDIO_RET_PARAM
       );
     }
     if (this.supports(FunctionTypeT1.UPSCALING_AUTO_OFF)) {
-      await this.request(
-        DataType.DATA_MDR,
-        Audio.encodeGetAudioParam(AudioInquiredType.UPSCALING),
-        CommandT1.AUDIO_RET_PARAM
-      );
+      await ask("DSEE", Audio.encodeGetAudioParam(AudioInquiredType.UPSCALING), CommandT1.AUDIO_RET_PARAM);
     }
     if (this.supports(FunctionTypeT1.SMART_TALKING_MODE_TYPE2)) {
-      await this.request(DataType.DATA_MDR, System.encodeGetSpeakToChat(), CommandT1.SYSTEM_RET_PARAM);
-      await this.request(
-        DataType.DATA_MDR,
-        System.encodeGetSpeakToChatDetail(),
-        CommandT1.SYSTEM_RET_EXT_PARAM
-      );
+      await ask("Speak-to-Chat", System.encodeGetSpeakToChat(), CommandT1.SYSTEM_RET_PARAM);
+      await ask("Speak-to-Chat detail", System.encodeGetSpeakToChatDetail(), CommandT1.SYSTEM_RET_EXT_PARAM);
     }
     if (this.supports(FunctionTypeT1.PLAYBACK_CONTROL_BY_WEARING_REMOVING_HEADPHONE_ON_OFF)) {
-      await this.request(
-        DataType.DATA_MDR,
+      await ask(
+        "pause on removal",
         System.encodeGetSystemParam(SystemInquiredType.PLAYBACK_CONTROL_BY_WEARING),
         CommandT1.SYSTEM_RET_PARAM
       );
