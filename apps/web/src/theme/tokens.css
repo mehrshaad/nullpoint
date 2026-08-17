@@ -36,8 +36,10 @@
   --track: #e4e4df;
   --fg: #17191c;
   --fg2: #565c64;
-  /* Same correction on light: #878d95 was 3.35:1 on white, this is 4.6:1. */
-  --fg3: #6f757e;
+  /* Measured against --bg, not --panel: the landing page sits on #f4f4f2, where the previous
+     #6f757e was 4.22:1 — under the readable threshold on exactly the small mono captions that
+     use it. This is 4.81:1 there and better still on a white panel. */
+  --fg3: #666c75;
   --stripe: #dcdcd6;
   --accent: #2c6bc9;
   --accent-soft: rgba(44, 107, 201, 0.1);
@@ -106,7 +108,7 @@ a:hover {
     animation: none;
   }
   /* Collapsing sections snap rather than slide when motion is unwelcome. */
-  .dashboard-grid * {
+  .measure * {
     transition-duration: 0.01ms !important;
   }
 }
@@ -143,36 +145,10 @@ button {
   cursor: pointer;
 }
 
-/* design §5.3 rule 4 "Responsive floor" — below 760px the dashboard stacks
-   NOISE CONTROL above EQUALIZER instead of the side-by-side two-column grid. */
-/* Columns, filled independently — each panel is exactly as tall as its contents instead of
-   being stretched to match whatever sits beside it. A short PLAYBACK panel next to a long
-   SOUND & SPEECH used to become a mostly-empty box.
-   CSS columns rather than grid because this is the one layout primitive that packs blocks of
-   differing heights without leaving a hole under the short one. */
-/* As many columns as the width allows, each at least 320px, falling to one on a narrow window.
-   `auto-fit` does the responsiveness without a single media query.
-
-   This deliberately isn't CSS multicol. Multicol inside a fixed-height scrolling container does
-   not flow downward — it starts a new column to the right instead, so panels past the fold end
-   up off-screen and, with horizontal overflow hidden, invisible entirely. A grid flows down and
-   scrolls, which is the behaviour anyone actually expects. */
-.dashboard-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
-  gap: 14px;
-  /* Each panel is only as tall as its contents rather than stretched to match its row. */
-  align-items: start;
-  align-content: start;
-}
-
-/* Grid items default to min-width:auto, so one panel with wide unbreakable content stretches
-   its whole track and pushes the page into horizontal scroll — which reads as every panel
-   being clipped, not as the one panel being too wide. Let tracks shrink instead. */
-.dashboard-grid > * {
-  min-width: 0;
-}
-
+/* The dashboard packs its panels into independent columns — see components/Masonry.tsx for
+   why that is a component and not a few lines of CSS here. Grid aligns items into rows, so a
+   short panel beside a tall one leaves a hole; multicol packs but rebalances every column
+   whenever anything changes height, which makes panels jump during a collapse animation. */
 
 /* Every screen needs an upper width bound as well as a lower one: on an ultrawide, content
    would otherwise stretch the full width of the display and strand the controls in dead space.

@@ -4,6 +4,7 @@ import { AmbientSoundMode, BatteryChargingStatus, EqPresetId, noiseModeFromState
 import { customEqKey, type EqProfile } from "../state/useSettings.js";
 import { TitleBar } from "./TitleBar.js";
 import { DeviceArt } from "../components/DeviceArt.js";
+import { Masonry } from "../components/Masonry.js";
 import { ConnectedDevices } from "../components/ConnectedDevices.js";
 import { SoundSettings } from "../components/SoundSettings.js";
 import { NowPlaying } from "../components/NowPlaying.js";
@@ -247,11 +248,11 @@ export function Dashboard({
         )}
       </div>
 
+      {/* Scrolling and laying out were the same element, which is what broke: a layout container
+          with a constrained height can't flow its own overflow. The outer div scrolls, the
+          Masonry inside is free to be as tall as its contents. */}
       <div
-        className="dashboard-grid measure"
         style={{
-          // The column layout in tokens.css handles packing; the grid just needs to scroll and
-          // keep its gutters.
           flex: 1,
           minHeight: 0,
           overflowY: "auto",
@@ -261,6 +262,8 @@ export function Dashboard({
           transition: "opacity .18s ease",
         }}
       >
+        <div className="measure">
+        <Masonry>
         {ncAsm ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 15, border: "1px solid var(--line)", borderRadius: 12, background: "var(--panel)" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: 16 }}>
@@ -365,9 +368,9 @@ export function Dashboard({
           onUpmixSeriesChange={(item) => void headphones.setUpmixSeries(item)}
         />
 
-        {/* Flows into the second column beside SOUND & SPEECH rather than spanning the width:
-            stretched across an ultrawide, three device rows leave an enormous gap between the
-            name and its buttons. Absent entirely on headphones that don't report a list. */}
+        {/* Packs into whichever column is next rather than spanning the width: stretched across
+            an ultrawide, three device rows leave an enormous gap between the name and its
+            buttons. Absent entirely on headphones that don't report a list. */}
         {state.pairedDevices && (
           <ConnectedDevices
             devices={state.pairedDevices}
@@ -375,6 +378,8 @@ export function Dashboard({
             onSwitchAudio={(address) => headphones.switchAudioTo(address)}
           />
         )}
+        </Masonry>
+        </div>
       </div>
     </div>
   );
