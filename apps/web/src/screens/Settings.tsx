@@ -19,6 +19,12 @@ const TOGGLE_ROWS: ToggleRow[] = [
   { key: "startMinimized", label: "Start minimised to tray", hint: "SKIPS THE MAIN WINDOW", desktopOnly: true },
   { key: "closeToTray", label: "Keep running when window closes", hint: "CLOSING HIDES TO THE TRAY", desktopOnly: true },
   { key: "reconnectAutomatically", label: "Reconnect automatically", hint: "WHEN THE DEVICE POWERS ON" },
+  {
+    key: "hotkeys",
+    label: "Global shortcuts",
+    hint: "CTRL+ALT+N CYCLES · 1 ANC · 2 AMBIENT · 3 OFF",
+    desktopOnly: true,
+  },
   { key: "showSoundPressure", label: "Show sound pressure readout", hint: "ESTIMATED, NOT CALIBRATED" },
 ];
 

@@ -12,8 +12,14 @@ export interface DesktopSettings {
   reconnectAutomatically: boolean;
   showSoundPressure: boolean;
   theme: "system" | "dark" | "light";
+  accent: string;
+  /** Global media-key style shortcuts for the noise modes, working from any application. */
+  hotkeys: boolean;
   /** User equalizer curves, keyed by model and band layout. Mirrors AppSettings in the web app. */
   customEq: Record<string, number[]>;
+  /** Named curves and remembered headsets — owned by the renderer, persisted here. */
+  eqProfiles: unknown[];
+  knownDevices: string[];
 }
 
 export const DEFAULT_SETTINGS: DesktopSettings = {
@@ -23,7 +29,11 @@ export const DEFAULT_SETTINGS: DesktopSettings = {
   reconnectAutomatically: true,
   showSoundPressure: false,
   theme: "system",
+  accent: "blue",
+  hotkeys: true,
   customEq: {},
+  eqProfiles: [],
+  knownDevices: [],
 };
 
 function settingsPath(): string {

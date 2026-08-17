@@ -97,6 +97,8 @@ export function SoundSettings({
   onConnectionModeChange,
   onUpscalingChange,
   onSpeakToChatChange,
+  speakToChatLocked,
+  onLockSpeakToChange,
   onPauseOnRemovalChange,
   onHeadGestureChange,
   onAutoPowerOffChange,
@@ -114,6 +116,10 @@ export function SoundSettings({
   onConnectionModeChange: (mode: PriorMode) => void;
   onUpscalingChange: (value: UpscalingTypeAutoOff) => void;
   onSpeakToChatChange: (next: SpeakToChatState) => void;
+  /** True when the app is holding Speak-to-Chat at a chosen value. */
+  speakToChatLocked?: boolean;
+  /** Pass a value to lock it there, or undefined to stop holding it. */
+  onLockSpeakToChange?: (value: boolean | undefined) => void;
   onPauseOnRemovalChange: (enabled: boolean) => void;
   onHeadGestureChange: (enabled: boolean) => void;
   onAutoPowerOffChange: (value: AutoPowerOff) => void;
@@ -239,11 +245,40 @@ export function SoundSettings({
       {speakToChat && (
         <>
           <Row label="Speak-to-Chat" hint="Pauses your music when you start talking">
-            <Switch
-              checked={speakToChat.enabled}
-              onChange={(enabled) => onSpeakToChatChange({ ...speakToChat, enabled })}
-              ariaLabel="Speak-to-Chat"
-            />
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {/* Speak-to-Chat is reported switching itself back on, during meetings. Locking
+                  it makes the app put it back whenever the headset changes it. */}
+              {onLockSpeakToChange && (
+                <button
+                  onClick={() => onLockSpeakToChange(speakToChatLocked ? undefined : speakToChat.enabled)}
+                  aria-pressed={speakToChatLocked}
+                  title={
+                    speakToChatLocked
+                      ? "Locked — the app puts this back if the headphones change it"
+                      : "Lock this setting"
+                  }
+                  className="mono"
+                  style={{
+                    fontSize: 9.5,
+                    fontWeight: 500,
+                    letterSpacing: "0.08em",
+                    padding: "5px 8px",
+                    borderRadius: 6,
+                    cursor: "pointer",
+                    color: speakToChatLocked ? "var(--accent)" : "var(--fg3)",
+                    border: `1px solid ${speakToChatLocked ? "var(--accent)" : "var(--line)"}`,
+                    background: "none",
+                  }}
+                >
+                  {speakToChatLocked ? "LOCKED" : "LOCK"}
+                </button>
+              )}
+              <Switch
+                checked={speakToChat.enabled}
+                onChange={(enabled) => onSpeakToChatChange({ ...speakToChat, enabled })}
+                ariaLabel="Speak-to-Chat"
+              />
+            </div>
           </Row>
           <Collapse open={speakToChat.enabled} parentGap={16}>
             <div style={{ display: "flex", flexDirection: "column", gap: 16, paddingTop: 16 }}>

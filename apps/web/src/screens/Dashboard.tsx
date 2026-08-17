@@ -24,6 +24,8 @@ export function Dashboard({
   savedCustomEq,
   onCustomEqChange,
   eqProfiles = [],
+  speakToChatLocked,
+  onLockSpeakToChange,
   onSaveEqProfile,
   onDeleteEqProfile,
   onCancelReconnect,
@@ -41,6 +43,8 @@ export function Dashboard({
   onCustomEqChange?: (key: string, values: number[]) => void;
   /** Named curves the app stores on the user's behalf; the headset can't keep them. */
   eqProfiles?: EqProfile[];
+  speakToChatLocked?: boolean;
+  onLockSpeakToChange?: (value: boolean | undefined) => void;
   onSaveEqProfile?: (name: string, bands: EqBands) => void;
   onDeleteEqProfile?: (id: string) => void;
   onCancelReconnect: () => void;
@@ -350,6 +354,8 @@ export function Dashboard({
           onConnectionModeChange={(mode) => void headphones.setConnectionMode(mode)}
           onUpscalingChange={(value) => void headphones.setUpscaling(value)}
           onSpeakToChatChange={(next) => void headphones.setSpeakToChat(next)}
+          speakToChatLocked={speakToChatLocked}
+          onLockSpeakToChange={onLockSpeakToChange}
           onPauseOnRemovalChange={(enabled) => void headphones.setPauseOnRemoval(enabled)}
           onHeadGestureChange={(enabled) => void headphones.setHeadGesture(enabled)}
           onAutoPowerOffChange={(value) => void headphones.setAutoPowerOff(value)}

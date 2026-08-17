@@ -26,6 +26,26 @@
     <meta name="twitter:card" content="summary_large_image" />
 
     <!-- manifest link + service worker are injected by vite-plugin-pwa (see vite.config.ts) -->
+
+    <!--
+      Resolve the theme before the first paint. The stylesheet's default palette is dark, so a
+      light-mode machine would otherwise flash dark for as long as it takes React to boot. Reads
+      the saved preference directly because the settings hook hasn't run yet.
+    -->
+    <script>
+      (function () {
+        try {
+          var saved = JSON.parse(localStorage.getItem("nullpoint.settings") || "{}");
+          var theme = saved.theme || "system";
+          if (theme === "system") {
+            theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+          }
+          document.documentElement.setAttribute("data-theme", theme);
+        } catch (e) {
+          document.documentElement.setAttribute("data-theme", "dark");
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

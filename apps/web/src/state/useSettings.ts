@@ -37,6 +37,14 @@ export interface AppSettings {
   showSoundPressure: boolean;
   theme: "system" | "dark" | "light";
   accent: AccentName;
+  /** Global noise-mode shortcuts, working from any application. Desktop only. */
+  hotkeys: boolean;
+  /**
+   * Settings the app holds in place. Speak-to-Chat in particular is reported turning itself
+   * back on — during meetings, which is exactly when it hurts — so when a lock is set and the
+   * headset announces a different value, the app writes the intended one back.
+   */
+  lockedSettings: { speakToChat?: boolean };
   /**
    * The user's own equalizer curve, kept here rather than on the headset.
    *
@@ -69,6 +77,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   showSoundPressure: false,
   theme: "system",
   accent: "blue",
+  hotkeys: true,
+  lockedSettings: {},
   customEq: {},
   eqProfiles: [],
   knownDevices: [],
@@ -84,6 +94,10 @@ interface NullpointBridge {
   getSettings(): Promise<AppSettings>;
   setSettings(patch: Partial<AppSettings>): Promise<AppSettings>;
   onSettingsChanged(cb: (settings: AppSettings) => void): () => void;
+  /** Global shortcut presses. Only the renderer holds the connection, so it does the work. */
+  onHotkey(cb: (action: string) => void): () => void;
+  /** Mirrors connection state so the tray menu can show and change the mode. */
+  reportDeviceState(state: { model: string | null; battery: number | null; mode: string | null }): void;
 }
 
 declare global {
@@ -106,11 +120,21 @@ function loadLocal(): AppSettings {
   }
 }
 
+const DARK_QUERY = "(prefers-color-scheme: dark)";
+
+/**
+ * What "system" actually means right now. Resolved here rather than in CSS because the
+ * stylesheet's light palette hangs off `[data-theme="light"]` — leaving the attribute off, as
+ * "system" used to, fell straight through to the dark values and never followed the OS at all.
+ */
+function resolveTheme(theme: AppSettings["theme"]): "dark" | "light" {
+  if (theme !== "system") return theme;
+  return window.matchMedia(DARK_QUERY).matches ? "dark" : "light";
+}
+
 /** Applies the theme choice to the document, which is what tokens.css keys off. */
 function applyTheme(theme: AppSettings["theme"]): void {
-  const root = document.documentElement;
-  if (theme === "system") root.removeAttribute("data-theme");
-  else root.setAttribute("data-theme", theme);
+  document.documentElement.setAttribute("data-theme", resolveTheme(theme));
 }
 
 /**
@@ -121,10 +145,7 @@ function applyTheme(theme: AppSettings["theme"]): void {
 function applyAccent(accent: AccentName, theme: AppSettings["theme"]): void {
   const root = document.documentElement;
   const pick = ACCENTS[accent] ?? ACCENTS.blue;
-  const dark =
-    theme === "dark" ||
-    (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-  const value = dark ? pick.dark : pick.light;
+  const value = resolveTheme(theme) === "dark" ? pick.dark : pick.light;
   root.style.setProperty("--accent", value);
   // The soft variant is the same hue at low alpha, so it can be derived rather than listed.
   root.style.setProperty("--accent-soft", `color-mix(in srgb, ${value} 14%, transparent)`);
@@ -149,8 +170,16 @@ export function useSettings() {
   }, [bridge]);
 
   useEffect(() => {
-    applyTheme(settings.theme);
-    applyAccent(settings.accent, settings.theme);
+    const apply = () => {
+      applyTheme(settings.theme);
+      applyAccent(settings.accent, settings.theme);
+    };
+    apply();
+    // On "system", follow the OS switching underneath us rather than only at startup.
+    if (settings.theme !== "system") return;
+    const query = window.matchMedia(DARK_QUERY);
+    query.addEventListener("change", apply);
+    return () => query.removeEventListener("change", apply);
   }, [settings.theme, settings.accent]);
 
   const update = useCallback(

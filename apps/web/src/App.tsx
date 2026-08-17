@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { noiseModeFromState, type NoiseMode } from "@ssc/core";
 import { useHeadphones } from "./state/useHeadphones.js";
 import { useSettings } from "./state/useSettings.js";
 import { ConnectIdle } from "./screens/ConnectIdle.js";
@@ -13,6 +14,48 @@ export function App() {
   const { connection, deviceState, controlLost, connect, reconnectKnown, grantedPorts, reset, headphones } =
     useHeadphones({ autoReconnect: settings.reconnectAutomatically });
   const [showSettings, setShowSettings] = useState(false);
+
+  // Global shortcuts arrive from the desktop shell, which owns the keys but not the connection.
+  // Applied straight to the headset — the whole point is not having to open a window first.
+  useEffect(() => {
+    const bridge = window.nullpoint;
+    if (!bridge?.onHotkey) return;
+    return bridge.onHotkey((action) => {
+      const hp = headphones;
+      if (!hp?.state.ncAsm) return;
+      if (action === "cycle") {
+        const order: NoiseMode[] = ["anc", "ambient", "off"];
+        const next = order[(order.indexOf(noiseModeFromState(hp.state.ncAsm)) + 1) % order.length]!;
+        void hp.setNoiseMode(next);
+        return;
+      }
+      if (action === "anc" || action === "ambient" || action === "off") {
+        void hp.setNoiseMode(action);
+      }
+    });
+  }, [headphones]);
+
+  // Hold locked settings in place. Speak-to-Chat is reported switching itself back on, so when
+  // it drifts from what was locked, write the intended value back. Guarded on the current value
+  // so this can only ever fire on an actual change — never a loop against the headset.
+  const lockedStc = settings.lockedSettings.speakToChat;
+  const liveStc = deviceState?.speakToChat;
+  useEffect(() => {
+    if (lockedStc === undefined || !liveStc || !headphones) return;
+    if (liveStc.enabled === lockedStc) return;
+    void headphones.setSpeakToChat({ ...liveStc, enabled: lockedStc });
+  }, [lockedStc, liveStc, headphones]);
+
+  // Mirror the essentials to the tray, so the menu can show battery and the current mode and
+  // change it without the window ever opening.
+  const ncAsm = deviceState?.ncAsm;
+  useEffect(() => {
+    window.nullpoint?.reportDeviceState?.({
+      model: deviceState?.modelName ?? null,
+      battery: deviceState?.battery?.level ?? null,
+      mode: ncAsm ? noiseModeFromState(ncAsm) : null,
+    });
+  }, [deviceState?.modelName, deviceState?.battery?.level, ncAsm]);
 
   // Remember what connected, so the reconnect button can carry a name. Granted ports have no
   // identity of their own, so this list is the only source for one.
@@ -78,6 +121,10 @@ export function App() {
           savedCustomEq={settings.customEq}
           onCustomEqChange={(key, values) =>
             void update({ customEq: { ...settings.customEq, [key]: values } })
+          }
+          speakToChatLocked={settings.lockedSettings.speakToChat !== undefined}
+          onLockSpeakToChange={(value) =>
+            void update({ lockedSettings: { ...settings.lockedSettings, speakToChat: value } })
           }
           eqProfiles={settings.eqProfiles}
           onSaveEqProfile={(name, bands) =>

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, Tray, ipcMain, nativeImage, net, protocol, session } from "electron";
+import { app, BrowserWindow, Menu, Tray, globalShortcut, ipcMain, nativeImage, net, protocol, session } from "electron";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import {
@@ -161,13 +161,70 @@ function buildTray(): void {
   });
 }
 
+/**
+ * What the renderer last told us about the headphones, so the tray can show and change the
+ * noise mode without opening a window. The main process has no Bluetooth connection of its
+ * own — this is a mirror, and every action is sent back to the renderer to perform.
+ */
+let trayState: { model: string | null; battery: number | null; mode: string | null } = {
+  model: null,
+  battery: null,
+  mode: null,
+};
+
+function sendHotkey(action: string): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    win.webContents.send("nullpoint:hotkey", action);
+  }
+}
+
 function refreshTrayMenu(): void {
   if (!tray) return;
   const settings = readSettings();
+  const connected = trayState.model !== null;
+  const status = connected
+    ? `${trayState.model}${trayState.battery !== null ? `  ${trayState.battery}%` : ""}`
+    : "No headphones connected";
+  tray.setToolTip(connected ? `Nullpoint — ${status}` : "Nullpoint");
   tray.setContextMenu(
     Menu.buildFromTemplate([
+      { label: status, enabled: false },
+      { type: "separator" },
+      // Radio items rather than buttons: the tray should show which mode is active, not just
+      // offer three ways to change it.
+      {
+        label: "Noise Cancelling",
+        type: "radio",
+        enabled: connected,
+        checked: trayState.mode === "anc",
+        click: () => sendHotkey("anc"),
+      },
+      {
+        label: "Ambient Sound",
+        type: "radio",
+        enabled: connected,
+        checked: trayState.mode === "ambient",
+        click: () => sendHotkey("ambient"),
+      },
+      {
+        label: "Off",
+        type: "radio",
+        enabled: connected,
+        checked: trayState.mode === "off",
+        click: () => sendHotkey("off"),
+      },
+      { type: "separator" },
       { label: "Open Nullpoint", click: () => showWindow() },
       { type: "separator" },
+      {
+        label: "Global shortcuts",
+        type: "checkbox",
+        checked: settings.hotkeys,
+        click: (item) => {
+          writeSettings({ hotkeys: item.checked });
+          broadcastSettings();
+        },
+      },
       {
         label: "Launch at login",
         type: "checkbox",
@@ -190,8 +247,39 @@ function refreshTrayMenu(): void {
   );
 }
 
+/**
+ * Noise-mode shortcuts that work from any application — the whole point of a desktop client,
+ * and the thing people were writing separate utilities to get.
+ *
+ * The main process owns the keys but not the headphones: only the renderer holds the Bluetooth
+ * connection, so a press is forwarded to it. That works even with the window hidden in the
+ * tray, because hiding keeps the renderer alive.
+ */
+const HOTKEYS: Array<{ accelerator: string; action: string }> = [
+  { accelerator: "CommandOrControl+Alt+N", action: "cycle" },
+  { accelerator: "CommandOrControl+Alt+1", action: "anc" },
+  { accelerator: "CommandOrControl+Alt+2", action: "ambient" },
+  { accelerator: "CommandOrControl+Alt+3", action: "off" },
+];
+
+function applyHotkeys(): void {
+  globalShortcut.unregisterAll();
+  if (!readSettings().hotkeys) return;
+  for (const { accelerator, action } of HOTKEYS) {
+    // Registration fails when another app already owns the combination. That is not an error
+    // worth interrupting anyone over, but it should not be silent either.
+    const ok = globalShortcut.register(accelerator, () => {
+      for (const win of BrowserWindow.getAllWindows()) {
+        win.webContents.send("nullpoint:hotkey", action);
+      }
+    });
+    if (!ok) console.warn(`[nullpoint] another application already owns ${accelerator}`);
+  }
+}
+
 function broadcastSettings(): void {
   refreshTrayMenu();
+  applyHotkeys();
   const settings = readSettings();
   for (const win of BrowserWindow.getAllWindows()) {
     win.webContents.send("nullpoint:settings-changed", settings);
@@ -229,6 +317,11 @@ if (!app.requestSingleInstanceLock()) {
     const settings = readSettings();
     applyLoginItemSetting(settings.launchAtLogin);
 
+    // The renderer mirrors its connection state here so the tray can reflect it.
+    ipcMain.on("nullpoint:device-state", (_event, next: typeof trayState) => {
+      trayState = next;
+      refreshTrayMenu();
+    });
     ipcMain.handle("nullpoint:get-settings", () => readSettings());
     ipcMain.handle("nullpoint:set-settings", (_event, patch: Partial<DesktopSettings>) => {
       const next = writeSettings(patch);
@@ -238,6 +331,7 @@ if (!app.requestSingleInstanceLock()) {
     });
 
     buildTray();
+    applyHotkeys();
 
     const startHidden = shouldStartHidden() || settings.startMinimized;
     mainWindow = createWindow(!startHidden);

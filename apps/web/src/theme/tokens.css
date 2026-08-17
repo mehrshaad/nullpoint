@@ -150,25 +150,27 @@ button {
    SOUND & SPEECH used to become a mostly-empty box.
    CSS columns rather than grid because this is the one layout primitive that packs blocks of
    differing heights without leaving a hole under the short one. */
-/* A column *width* rather than a count: the browser fits as many as the space allows and drops
-   to one when it can't. Fixing the count instead made narrow windows keep two columns and
-   overflow sideways, and horizontal scroll on a settings panel is always a bug.
-   The second value caps it at three — past that the panels stretch and the eye has too far to
-   travel across an ultrawide. */
+/* As many columns as the width allows, each at least 320px, falling to one on a narrow window.
+   `auto-fit` does the responsiveness without a single media query.
+
+   This deliberately isn't CSS multicol. Multicol inside a fixed-height scrolling container does
+   not flow downward — it starts a new column to the right instead, so panels past the fold end
+   up off-screen and, with horizontal overflow hidden, invisible entirely. A grid flows down and
+   scrolls, which is the behaviour anyone actually expects. */
 .dashboard-grid {
-  columns: 340px 3;
-  column-gap: 14px;
-  /* Nothing here should ever scroll sideways; if a panel can't fit, it wraps or clips. */
-  overflow-x: hidden;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
+  gap: 14px;
+  /* Each panel is only as tall as its contents rather than stretched to match its row. */
+  align-items: start;
+  align-content: start;
 }
 
-/* Panels must not be split down the middle by a column break. */
+/* Grid items default to min-width:auto, so one panel with wide unbreakable content stretches
+   its whole track and pushes the page into horizontal scroll — which reads as every panel
+   being clipped, not as the one panel being too wide. Let tracks shrink instead. */
 .dashboard-grid > * {
   min-width: 0;
-  break-inside: avoid;
-  /* `break-inside` alone is ignored by some engines in multicol; this is the belt to its braces. */
-  page-break-inside: avoid;
-  margin-bottom: 14px;
 }
 
 
