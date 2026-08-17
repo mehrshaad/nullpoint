@@ -243,8 +243,9 @@
   margin-left: auto;
   font-family: "IBM Plex Mono", monospace;
   font-size: 10.5px;
+  /* Was dimmed a further 25% on top of --fg3, which took it to 2.74:1. Small mono text needs
+     the colour it is given, not a fraction of it. */
   color: var(--fg3);
-  opacity: 0.75;
 }
 
 .lp-wire-body {
@@ -342,7 +343,8 @@
   font-family: "IBM Plex Mono", monospace;
   font-size: 9.5px;
   letter-spacing: 0.08em;
-  opacity: 0.66;
+  /* 9.5px is the smallest type on the page; at 0.66 opacity it measured 2.39:1. */
+  color: var(--fg3);
 }
 
 /* The indicator carries the surface, so a selected cell only changes its label colour. */
