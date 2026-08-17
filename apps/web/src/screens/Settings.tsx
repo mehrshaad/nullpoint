@@ -2,6 +2,7 @@ import type { Headphones, HeadphonesState } from "@ssc/core";
 import { Switch } from "../components/Switch.js";
 import { CapabilityReport } from "../components/CapabilityReport.js";
 import { ProtocolInspector } from "../components/ProtocolInspector.js";
+import { SpatialDemo } from "../components/SpatialDemo.js";
 import { ACCENTS, type AccentName, type AppSettings } from "../state/useSettings.js";
 
 const THEMES: Array<AppSettings["theme"]> = ["system", "dark", "light"];
@@ -262,6 +263,11 @@ export function Settings({
           PROTOCOL INSPECTOR
         </div>
         <ProtocolInspector headphones={headphones ?? null} />
+
+        <div className="mono" style={{ fontWeight: 600, fontSize: 11, letterSpacing: "0.14em", color: "var(--fg3)" }}>
+          SPATIAL DEMO
+        </div>
+        <SpatialDemo />
 
         <div className="mono" style={{ fontWeight: 600, fontSize: 11, letterSpacing: "0.14em", color: "var(--fg3)" }}>
           ABOUT
