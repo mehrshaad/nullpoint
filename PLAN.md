@@ -93,16 +93,34 @@ control the hardware doesn't have rather than showing it disabled.
 | ✅ **Pause on removal** | Wear detection driving playback |
 | ✅ **Power off** | A button in Settings, beside the capability report |
 
-**Remaining**, highest value first:
+| ✅ **Auto power off** | Idle timeout, or when taken off, or never |
+| ✅ **Listening mode** | Background music with its room size, and cinema upmix |
+| ✅ **Head gestures** | Nod to answer, shake to decline |
+| ✅ **Playback and volume** | Relayed to whichever device is playing |
+| ✅ **Codec indicator** | What is actually carrying the audio |
+
+**Not implementable without new reverse-engineering.** These are advertised by a WH-1000XM6 and
+have **no payload structs anywhere in the ported reference** — command IDs exist, the messages
+do not. Building them means inventing byte layouts and writing them to real hardware, which is
+not a thing to guess at:
+
+| Capability | |
+|---|---|
+| `0x71` Adaptive Sound Control | Activity-based ANC switching. The `SENSE_*` command family has IDs and nothing else |
+| `0xB0` / `0xB7` SAR, head tracker | Spatial audio |
+| `0xFD` Quick access | Button shortcuts |
+| `0x69` Ambient mode select | |
+| `0x16` Connection established time | |
+
+Each would need a packet capture from Sony's own app to settle. Until then they stay out.
+
+**Remaining and buildable:**
 
 | Feature | Notes |
 |---|---|
-| **Adaptive Sound Control** | Auto-switches ANC/ambient by activity (still, walking, transport). Arguably the XM6's headline feature and entirely missing today |
 | **Touch sensor** | Enable/disable, and remap what each side does |
-| **Voice guidance** | On/off and volume |
-| **Auto power off** | Idle timeout, with or without wear detection |
-| **Listening mode** | Background-music mode and its distance setting |
 | **Safe listening** | Exposure reporting |
+| **Renaming the headphones** | Not possible: the protocol has no name-setting command at all, and `DeviceInfoType` is read-only. A local nickname is the nearest thing |
 
 The capability report in Settings lists every function type the headset advertised, including
 the ones Nullpoint ignores. That list is where the next features should come from — it says what

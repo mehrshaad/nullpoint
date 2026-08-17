@@ -15,9 +15,8 @@ function tint(mode: NoiseMode): string {
 }
 
 /**
- * The chosen mode is a solid button raised out of the track, not an outlined cell. Mixing the
- * tint into the panel colour keeps it opaque enough to read as a surface sitting on top, while
- * the unselected modes stay flat and borderless so there is something for it to sit above.
+ * The surface under the selected label. Mixed with the panel colour so it stays opaque enough
+ * to read as something sitting on the track rather than a wash over it.
  */
 function selectedSurface(mode: NoiseMode): string {
   if (mode === "ambient") return "color-mix(in srgb, var(--amber-soft) 70%, var(--panel))";
@@ -34,15 +33,37 @@ export function NoiseModeSegmented({ value, onChange }: { value: NoiseMode; onCh
       role="radiogroup"
       aria-label="Noise control mode"
       style={{
+        position: "relative",
         display: "grid",
         gridTemplateColumns: "1fr 1fr 1fr",
-        gap: 3,
+        // No gap between cells: the indicator below is exactly one third wide and steps by its
+        // own width, which only lines up if the cells are flush.
         padding: 3,
         borderRadius: 10,
         background: "var(--track)",
         border: "1px solid var(--line)",
       }}
     >
+      {/* One indicator that slides to the chosen mode, rather than three cells that light up
+          independently — so switching reads as the same object moving. It carries the border
+          too, without which "Off" is nearly invisible against the track. */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: "absolute",
+          top: 3,
+          bottom: 3,
+          left: 3,
+          width: "calc((100% - 6px) / 3)",
+          transform: `translateX(${ORDER.indexOf(value) * 100}%)`,
+          borderRadius: 8,
+          background: selectedSurface(value),
+          border: `1px solid ${tint(value)}`,
+          boxShadow: RAISED_SHADOW,
+          transition:
+            "transform .3s cubic-bezier(.4, 0, .2, 1), background .2s ease, border-color .2s ease",
+        }}
+      />
       {MODES.map((m, i) => {
         const on = value === m.id;
         const c = tint(m.id);
@@ -79,12 +100,12 @@ export function NoiseModeSegmented({ value, onChange }: { value: NoiseMode; onCh
               cursor: "pointer",
               outline: "none",
               userSelect: "none",
-              background: on ? selectedSurface(m.id) : "transparent",
+              // The indicator behind supplies the surface; the cell only carries its label.
+              position: "relative",
+              zIndex: 1,
+              background: "transparent",
               color: on ? c : "var(--fg3)",
-              transform: on ? "translateY(-1px)" : "none",
-              boxShadow: on ? RAISED_SHADOW : "none",
-              transition:
-                "background .2s ease, color .2s ease, transform .2s ease, box-shadow .2s ease",
+              transition: "color .22s ease",
             }}
           >
             <div style={{ fontWeight: 600, fontSize: 12 }}>{m.label}</div>

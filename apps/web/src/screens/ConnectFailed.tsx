@@ -19,7 +19,7 @@ export function ConnectFailed({
   const { headline, hint, steps, detail } = describeConnectError(new Error(message));
 
   return (
-    <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "var(--bg)" }}>
+    <div className="screen" style={{ height: "100%", display: "flex", flexDirection: "column", background: "var(--bg)" }}>
       <TitleBar statusColor="var(--warn)" />
       <div
         className="pad-x"

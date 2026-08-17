@@ -1,5 +1,7 @@
 import { EQ_LAYOUTS, EqPresetId, type EqBands } from "@ssc/core";
 import { useLinearDrag } from "./useLinearDrag.js";
+import { EqProfiles } from "./EqProfiles.js";
+import type { EqProfile } from "../state/useSettings.js";
 
 /**
  * design/SoundConnect Desktop.dc.html §1e "EqualizerPanel".
@@ -107,14 +109,22 @@ function BandSlider({
 export function EqualizerPanel({
   preset,
   bands,
+  profiles,
   onPresetChange,
   onBandChange,
+  onApplyProfile,
+  onSaveProfile,
+  onDeleteProfile,
 }: {
   preset: EqPresetId;
   bands: EqBands | null;
+  profiles: EqProfile[];
   onPresetChange: (preset: EqPresetId) => void;
   /** index is the band's position in the device's own order. */
   onBandChange: (index: number, value: number) => void;
+  onApplyProfile: (profile: EqProfile) => void;
+  onSaveProfile: (name: string, bands: EqBands) => void;
+  onDeleteProfile: (id: string) => void;
 }) {
   const spec = bands ? EQ_LAYOUTS[bands.layout] : null;
   // Presets compute their own curve; only Custom takes arbitrary band values.
@@ -202,6 +212,14 @@ export function EqualizerPanel({
           THIS PRESET HAS NO ADJUSTABLE BANDS
         </div>
       )}
+
+      <EqProfiles
+        profiles={profiles}
+        current={bands}
+        onApply={onApplyProfile}
+        onSave={onSaveProfile}
+        onDelete={onDeleteProfile}
+      />
     </div>
   );
 }

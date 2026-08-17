@@ -2,7 +2,9 @@
 // Orchestration source: src/Headphones.{h,cpp} @ master (selectively — see PLAN.md §6 porting map).
 
 import {
+  AudioCodec,
   AudioInquiredType,
+  AutoPowerOff,
   CommandT1,
   CommandT2,
   ConnectivityActionType,
@@ -15,6 +17,7 @@ import {
   NoiseAdaptiveSensitivity,
   PeripheralInquiredType,
   PeripheralOutcome,
+  PlaybackControl,
   PowerInquiredType,
   PriorMode,
   SystemInquiredType,
@@ -29,6 +32,7 @@ import * as Eq from "./payloads/eq.js";
 import * as Peripheral from "./payloads/peripheral.js";
 import * as Audio from "./payloads/audio.js";
 import * as System from "./payloads/system.js";
+import * as Playback from "./payloads/playback.js";
 
 export interface HeadphonesState {
   modelName: string | null;
@@ -49,6 +53,19 @@ export interface HeadphonesState {
   speakToChat: System.SpeakToChatState | null;
   /** "Pause when you take them off." */
   pauseOnRemoval: boolean | null;
+  /** When the headphones switch themselves off. */
+  autoPowerOff: AutoPowerOff | null;
+  /** Background music mode — music placed around you rather than in your head. */
+  bgmMode: Audio.BgmModeState | null;
+  upmixCinema: boolean | null;
+  /** Nod to accept a call, shake to decline. */
+  headGesture: boolean | null;
+  /** Which codec is carrying audio right now. */
+  codec: AudioCodec | null;
+  /** Transport state of whatever device is playing. */
+  playback: Playback.PlaybackState | null;
+  /** 0–30, as the headset counts it. */
+  volume: number | null;
   /** Whether the headphones accept a power-off command; there is no value to read back. */
   canPowerOff: boolean;
 }
@@ -70,7 +87,19 @@ export type HeadphonesEvent =
   | { type: "deviceInfo" }
   | {
       type: "writeFailed";
-      feature: "ncAsm" | "eq" | "connectionMode" | "upscaling" | "speakToChat" | "pauseOnRemoval";
+      feature:
+        | "ncAsm"
+        | "eq"
+        | "connectionMode"
+        | "upscaling"
+        | "speakToChat"
+        | "pauseOnRemoval"
+        | "headGesture"
+        | "autoPowerOff"
+        | "bgmMode"
+        | "upmixCinema"
+        | "playback"
+        | "volume";
     }
   /**
    * The link is still open but the headset has stopped accepting commands — in practice
@@ -92,7 +121,12 @@ const BATTERY_REFRESH_MS = 60_000;
 const CONTROL_PROBE_MS = 4_000;
 /** How long to wait for the headset to announce that a change has taken effect. */
 const CONFIRM_TIMEOUT_MS = 2_500;
-/** Unanswered probes tolerated before we relink rather than keep waiting. */
+/**
+ * Unanswered exchanges before the app says anything is wrong. One miss is usually a momentary
+ * stall; announcing it made the UI flicker between usable and disabled for nothing.
+ */
+const DECLARE_LOST_AFTER = 2;
+/** Further unanswered probes after that before relinking rather than waiting. */
 const RECLAIM_AFTER_FAILED_PROBES = 2;
 
 /**
@@ -117,6 +151,13 @@ export class Headphones {
     upscaling: null,
     speakToChat: null,
     pauseOnRemoval: null,
+    autoPowerOff: null,
+    bgmMode: null,
+    upmixCinema: null,
+    headGesture: null,
+    codec: null,
+    playback: null,
+    volume: null,
     canPowerOff: false,
   };
 
@@ -246,6 +287,44 @@ export class Headphones {
         CommandT1.SYSTEM_RET_PARAM
       );
     }
+    if (this.supports(FunctionTypeT1.HEAD_GESTURE_ON_OFF_TRAINING)) {
+      await ask(
+        "head gestures",
+        System.encodeGetSystemParam(SystemInquiredType.HEAD_GESTURE_ON_OFF),
+        CommandT1.SYSTEM_RET_PARAM
+      );
+    }
+    if (this.supports(FunctionTypeT1.AUTO_POWER_OFF_WITH_WEARING_DETECTION)) {
+      await ask("auto power off", Battery.encodeGetAutoPowerOff(), CommandT1.POWER_RET_PARAM);
+    }
+    // The headset advertises which BGM variant it speaks; both carry the same payload.
+    this.bgmInquiredType = this.supports(FunctionTypeT1.BGM_MODE_SMALL_MIDDLE_LARGE_AND_ERRORCODE)
+      ? AudioInquiredType.BGM_MODE_AND_ERRORCODE
+      : AudioInquiredType.BGM_MODE;
+    if (
+      this.supports(FunctionTypeT1.LISTENING_OPTION) ||
+      this.supports(FunctionTypeT1.BGM_MODE_SMALL_MIDDLE_LARGE_AND_ERRORCODE)
+    ) {
+      await ask(
+        "background music mode",
+        Audio.encodeGetAudioParam(this.bgmInquiredType),
+        CommandT1.AUDIO_RET_PARAM
+      );
+    }
+    if (this.supports(FunctionTypeT1.UPMIX_CINEMA)) {
+      await ask(
+        "cinema upmix",
+        Audio.encodeGetAudioParam(AudioInquiredType.UPMIX_CINEMA),
+        CommandT1.AUDIO_RET_PARAM
+      );
+    }
+    if (this.supports(FunctionTypeT1.CODEC_INDICATOR)) {
+      await ask("the codec in use", Playback.encodeGetCodec(), CommandT1.COMMON_RET_STATUS);
+    }
+    if (this.supports(FunctionTypeT1.PLAYBACK_CONTROLLER_WITH_CALL_VOLUME_ADJUSTMENT)) {
+      await ask("playback state", Playback.encodeGetPlayback(), CommandT1.PLAY_RET_STATUS);
+      await ask("volume", Playback.encodeGetVolume(), CommandT1.PLAY_RET_PARAM);
+    }
     // Nothing to read: this one is an action, not a value.
     this.state.canPowerOff = this.supports(FunctionTypeT1.POWER_OFF);
   }
@@ -255,6 +334,63 @@ export class Headphones {
     await this.writeSetting("pauseOnRemoval", enabled, () =>
       System.encodeSetSystemParam(SystemInquiredType.PLAYBACK_CONTROL_BY_WEARING, enabled)
     );
+  }
+
+  /** Nod to accept a call, shake to decline. */
+  async setHeadGesture(enabled: boolean): Promise<void> {
+    await this.writeSetting("headGesture", enabled, () =>
+      System.encodeSetSystemParam(SystemInquiredType.HEAD_GESTURE_ON_OFF, enabled)
+    );
+  }
+
+  /** When the headphones switch themselves off after being left idle. */
+  async setAutoPowerOff(value: AutoPowerOff): Promise<void> {
+    await this.writeSetting("autoPowerOff", value, () => Battery.encodeSetAutoPowerOff(value));
+  }
+
+  /** Background music mode, and how far away it places what you're listening to. */
+  async setBgmMode(next: Audio.BgmModeState): Promise<void> {
+    await this.writeSetting("bgmMode", next, () =>
+      Audio.encodeSetBgmMode(this.bgmInquiredType, next)
+    );
+  }
+
+  async setUpmixCinema(enabled: boolean): Promise<void> {
+    await this.writeSetting("upmixCinema", enabled, () => Audio.encodeSetUpmixCinema(enabled));
+  }
+
+  /**
+   * Transport controls. These are relayed to whichever device is playing the audio, not stored
+   * on the headphones — which is what makes them work from a laptop while a phone is playing.
+   * The headset answers with the resulting state, so nothing is painted optimistically.
+   */
+  async playPause(): Promise<void> {
+    const playing = this.state.playback?.playing ?? false;
+    await this.sendPlaybackControl(playing ? PlaybackControl.PAUSE : PlaybackControl.PLAY);
+  }
+
+  async nextTrack(): Promise<void> {
+    await this.sendPlaybackControl(PlaybackControl.TRACK_UP);
+  }
+
+  async previousTrack(): Promise<void> {
+    await this.sendPlaybackControl(PlaybackControl.TRACK_DOWN);
+  }
+
+  private async sendPlaybackControl(control: PlaybackControl): Promise<void> {
+    if (!this.state.playback) throw new Error("These headphones don't relay playback controls.");
+    try {
+      await this.send(DataType.DATA_MDR, Playback.encodePlaybackControl(control));
+      this.noteResponsive();
+    } catch {
+      this.emit({ type: "writeFailed", feature: "playback" });
+      this.noteUnanswered();
+    }
+  }
+
+  /** 0–30. */
+  async setVolume(level: number): Promise<void> {
+    await this.writeSetting("volume", level, () => Playback.encodeSetVolume(level));
   }
 
   /**
@@ -308,7 +444,7 @@ export class Headphones {
       this.state.speakToChat = previous;
       this.emit({ type: "settings" });
       this.emit({ type: "writeFailed", feature: "speakToChat" });
-      this.noteControlLost();
+      this.noteUnanswered();
     }
   }
 
@@ -316,7 +452,17 @@ export class Headphones {
    * Paint the new value, write it, and put the old one back if the headset never took it —
    * the same contract every other control in the app follows.
    */
-  private async writeSetting<K extends "connectionMode" | "upscaling" | "pauseOnRemoval">(
+  private async writeSetting<
+    K extends
+      | "connectionMode"
+      | "upscaling"
+      | "pauseOnRemoval"
+      | "headGesture"
+      | "autoPowerOff"
+      | "bgmMode"
+      | "upmixCinema"
+      | "volume",
+  >(
     key: K,
     value: NonNullable<HeadphonesState[K]>,
     encode: () => Uint8Array
@@ -334,7 +480,7 @@ export class Headphones {
       this.state[key] = previous;
       this.emit({ type: "settings" });
       this.emit({ type: "writeFailed", feature: key });
-      this.noteControlLost();
+      this.noteUnanswered();
     }
   }
 
@@ -400,7 +546,10 @@ export class Headphones {
   private hasControl = true;
   private supportsTable2 = false;
   private ncAsmVariant: NcAsm.NcAsmVariant = "seamless";
-  private controlProbeFailures = 0;
+  /** Consecutive unanswered exchanges. Reset by any reply. */
+  private unanswered = 0;
+  /** Which background-music variant this headset speaks; set during the handshake. */
+  private bgmInquiredType: AudioInquiredType = AudioInquiredType.BGM_MODE;
 
   /** True while the headset is still accepting our commands. */
   get controllable(): boolean {
@@ -505,7 +654,7 @@ export class Headphones {
         this.emit({ type: "ncAsm", state: confirmed, origin: "device" });
       }
       this.emit({ type: "writeFailed", feature: "ncAsm" });
-      this.noteControlLost();
+      this.noteUnanswered();
     }
   }
 
@@ -534,41 +683,48 @@ export class Headphones {
 
   /** The headset answered us, so we still have the control channel. */
   private noteResponsive(): void {
-    this.controlProbeFailures = 0;
-    if (this.hasControl) return;
-    this.hasControl = true;
-    this.setBatteryInterval(BATTERY_REFRESH_MS);
-    this.emit({ type: "controlRegained" });
+    const wasStruggling = this.unanswered > 0;
+    this.unanswered = 0;
+    if (!this.hasControl) {
+      this.hasControl = true;
+      this.emit({ type: "controlRegained" });
+    }
+    // Back off the fast probe once it has served its purpose.
+    if (wasStruggling) this.setBatteryInterval(BATTERY_REFRESH_MS);
+  }
+
+  /**
+   * One exchange went unanswered.
+   *
+   * A single miss is usually a momentary stall — the headset is busy renegotiating a codec, or
+   * a call arrives — and announcing it immediately made the app flicker between usable and
+   * disabled for something that fixed itself a second later. So this starts probing faster
+   * right away, but stays quiet until a second miss corroborates it.
+   */
+  private noteUnanswered(): void {
+    this.unanswered += 1;
+    if (this.unanswered === 1) this.setBatteryInterval(CONTROL_PROBE_MS);
+    if (this.unanswered < DECLARE_LOST_AFTER || !this.hasControl) return;
+    this.hasControl = false;
+    this.emit({ type: "controlLost" });
   }
 
   /**
    * A probe went unanswered. Waiting is only worth so much: the headset keeps broadcasting
    * notifications while refusing our commands, so the link looks alive and the app sits there
    * showing values it can no longer change. Polling never wins the control channel back —
-   * reopening the port is what does (PROTOCOL.md, "the channel is reclaimable") — so after a
-   * few unanswered probes, drop the link and let the reconnect loop take it back.
+   * reopening the port is what does (PROTOCOL.md, "the channel is reclaimable") — so once the
+   * misses keep coming, drop the link and let the reconnect loop take it back.
    */
   private noteProbeFailed(): void {
-    this.noteControlLost();
-    this.controlProbeFailures += 1;
-    if (this.controlProbeFailures < RECLAIM_AFTER_FAILED_PROBES) return;
-    this.controlProbeFailures = 0;
+    this.noteUnanswered();
+    if (this.unanswered < DECLARE_LOST_AFTER + RECLAIM_AFTER_FAILED_PROBES) return;
+    this.unanswered = 0;
     this.stopBatteryRefresh();
     void this.transport
       .close()
       .catch(() => undefined)
       .then(() => this.emit({ type: "disconnected" }));
-  }
-
-  /**
-   * The headset stopped answering. Poll faster while in this state so that control is picked
-   * back up promptly once the other device lets go — the reply to the poll is what clears it.
-   */
-  private noteControlLost(): void {
-    if (!this.hasControl) return;
-    this.hasControl = false;
-    this.setBatteryInterval(CONTROL_PROBE_MS);
-    this.emit({ type: "controlLost" });
   }
 
   /**
@@ -594,7 +750,7 @@ export class Headphones {
       this.noteResponsive();
     } catch {
       this.emit({ type: "writeFailed", feature: "eq" });
-      this.noteControlLost();
+      this.noteUnanswered();
     }
   }
 
@@ -611,7 +767,7 @@ export class Headphones {
       this.state.eq = confirmed;
       this.emit({ type: "eq", state: confirmed, origin: "device" });
       this.emit({ type: "writeFailed", feature: "eq" });
-      this.noteControlLost();
+      this.noteUnanswered();
     }
   }
 
@@ -785,12 +941,46 @@ export class Headphones {
         this.emit({ type: "eq", state: eq, origin: command === CommandT1.EQEBB_NTFY_PARAM ? "device" : "local" });
         break;
       }
+      case CommandT1.COMMON_RET_STATUS:
+      case CommandT1.COMMON_NTFY_STATUS: {
+        const codec = Playback.decodeCodec(frame.payload);
+        if (codec === null) break;
+        this.state.codec = codec;
+        this.emit({ type: "settings" });
+        break;
+      }
+      case CommandT1.PLAY_RET_STATUS:
+      case CommandT1.PLAY_NTFY_STATUS: {
+        const playback = Playback.decodePlayback(frame.payload);
+        if (!playback) break;
+        this.state.playback = playback;
+        this.emit({ type: "settings" });
+        break;
+      }
+      case CommandT1.PLAY_RET_PARAM:
+      case CommandT1.PLAY_NTFY_PARAM: {
+        const volume = Playback.decodeVolume(frame.payload);
+        if (volume === null) break;
+        this.state.volume = volume;
+        this.emit({ type: "settings" });
+        break;
+      }
+      case CommandT1.POWER_RET_PARAM:
+      case CommandT1.POWER_NTFY_PARAM: {
+        const value = Battery.decodeAutoPowerOff(frame.payload);
+        if (value === null) break;
+        this.state.autoPowerOff = value;
+        this.emit({ type: "settings" });
+        break;
+      }
       case CommandT1.AUDIO_RET_PARAM:
       case CommandT1.AUDIO_NTFY_PARAM: {
         const param = Audio.decodeAudioParam(frame.payload);
         if (!param) break;
-        if (param.type === AudioInquiredType.CONNECTION_MODE) this.state.connectionMode = param.value;
-        else this.state.upscaling = param.value;
+        if (param.type === "connectionMode") this.state.connectionMode = param.value;
+        else if (param.type === "upscaling") this.state.upscaling = param.value;
+        else if (param.type === "bgmMode") this.state.bgmMode = param.value;
+        else this.state.upmixCinema = param.value;
         this.emit({ type: "settings" });
         break;
       }
@@ -802,6 +992,12 @@ export class Headphones {
         );
         if (wearing !== null) {
           this.state.pauseOnRemoval = wearing;
+          this.emit({ type: "settings" });
+          break;
+        }
+        const gesture = System.decodeSystemParam(frame.payload, SystemInquiredType.HEAD_GESTURE_ON_OFF);
+        if (gesture !== null) {
+          this.state.headGesture = gesture;
           this.emit({ type: "settings" });
           break;
         }

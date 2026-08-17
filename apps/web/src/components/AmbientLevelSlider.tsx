@@ -1,6 +1,7 @@
 import { NoiseAdaptiveSensitivity } from "@ssc/core";
 import { useLinearDrag } from "./useLinearDrag.js";
 import { Switch } from "./Switch.js";
+import { Collapse } from "./Collapse.js";
 
 const SENSITIVITY_OPTIONS: Array<{ value: NoiseAdaptiveSensitivity; label: string }> = [
   { value: NoiseAdaptiveSensitivity.LOW, label: "LOW" },
@@ -123,11 +124,11 @@ export function AmbientLevelSlider({
                 ariaLabel="Auto ambient level"
               />
             </div>
-            {autoAmbient.enabled && (
+            <Collapse open={autoAmbient.enabled} parentGap={9}>
               <div
                 role="radiogroup"
                 aria-label="Auto ambient sensitivity"
-                style={{ display: "flex", gap: 6 }}
+                style={{ display: "flex", gap: 6, paddingTop: 9 }}
               >
                 {SENSITIVITY_OPTIONS.map((option) => {
                   const selected = autoAmbient.sensitivity === option.value;
@@ -156,7 +157,7 @@ export function AmbientLevelSlider({
                   );
                 })}
               </div>
-            )}
+            </Collapse>
           </>
         )}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>

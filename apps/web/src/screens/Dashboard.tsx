@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import type { Headphones, HeadphonesState } from "@ssc/core";
-import { AmbientSoundMode, BatteryChargingStatus, EqPresetId, noiseModeFromState } from "@ssc/core";
-import { customEqKey } from "../state/useSettings.js";
+import { AmbientSoundMode, BatteryChargingStatus, EqPresetId, noiseModeFromState, type EqBands } from "@ssc/core";
+import { customEqKey, type EqProfile } from "../state/useSettings.js";
 import { TitleBar } from "./TitleBar.js";
 import { DeviceArt } from "../components/DeviceArt.js";
 import { ConnectedDevices } from "../components/ConnectedDevices.js";
 import { SoundSettings } from "../components/SoundSettings.js";
+import { NowPlaying } from "../components/NowPlaying.js";
 import { NoiseModeSegmented } from "../components/NoiseModeSegmented.js";
 import { AmbientLevelSlider } from "../components/AmbientLevelSlider.js";
 import { EqualizerPanel } from "../components/EqualizerPanel.js";
@@ -22,6 +23,9 @@ export function Dashboard({
   controlLost = false,
   savedCustomEq,
   onCustomEqChange,
+  eqProfiles = [],
+  onSaveEqProfile,
+  onDeleteEqProfile,
   onCancelReconnect,
 }: {
   state: HeadphonesState;
@@ -35,6 +39,10 @@ export function Dashboard({
   /** Persisted user equalizer curves, keyed by customEqKey(). */
   savedCustomEq?: Record<string, number[]>;
   onCustomEqChange?: (key: string, values: number[]) => void;
+  /** Named curves the app stores on the user's behalf; the headset can't keep them. */
+  eqProfiles?: EqProfile[];
+  onSaveEqProfile?: (name: string, bands: EqBands) => void;
+  onDeleteEqProfile?: (id: string) => void;
   onCancelReconnect: () => void;
 }) {
   const battery = state.battery;
@@ -61,7 +69,7 @@ export function Dashboard({
   }, [headphones]);
 
   return (
-    <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "var(--bg)" }}>
+    <div className="screen" style={{ height: "100%", display: "flex", flexDirection: "column", background: "var(--bg)" }}>
       <TitleBar statusColor={reconnecting ? "var(--warn)" : "var(--ok)"} onSettingsClick={onSettingsClick} />
 
       {reconnecting && (
@@ -87,7 +95,7 @@ export function Dashboard({
           />
           <div style={{ fontWeight: 500, fontSize: 12, lineHeight: 1.35, color: "var(--warn)" }}>
             {reconnectReason === "busy"
-              ? "Another device has the control channel — waiting for it to let go. This reconnects on its own; no need to retry."
+              ? "Another device is holding the settings channel — taking it back. Your music is unaffected. If it doesn't return, disconnect the headphones from your phone."
               : `Link lost — reconnecting to ${state.modelName ?? "your headphones"}…`}
           </div>
           <div style={{ flex: 1 }} />
@@ -124,9 +132,11 @@ export function Dashboard({
           }}
         >
           <div style={{ width: 7, height: 7, borderRadius: "50%", flex: "none", background: "var(--amber)" }} />
+          {/* We know the headset stopped answering; we do not know why. Naming the phone as
+              the culprit was a guess that read as fact. */}
           <div style={{ fontWeight: 500, fontSize: 12, lineHeight: 1.35, color: "var(--amber)" }}>
-            Another device has control. These headphones take settings from one device at a
-            time — disconnect them from your phone and this reconnects on its own.
+            Your headphones stopped answering — taking the settings channel back. If your phone
+            is connected, it may be holding it.
           </div>
         </div>
       )}
@@ -236,12 +246,11 @@ export function Dashboard({
       <div
         className="dashboard-grid measure"
         style={{
+          // The column layout in tokens.css handles packing; the grid just needs to scroll and
+          // keep its gutters.
           flex: 1,
           minHeight: 0,
-          // Panels size to their content and sit at the top rather than stretching to fill a
-          // tall window, which is what turned the EQ into a wall of ribbons.
-          alignContent: "start",
-          gap: 14,
+          overflowY: "auto",
           padding: "0 20px 20px",
           opacity: reconnecting || controlLost ? 0.6 : 1,
           pointerEvents: reconnecting || controlLost ? "none" : "auto",
@@ -279,9 +288,7 @@ export function Dashboard({
               }
             />
           </div>
-        ) : (
-          <div />
-        )}
+        ) : null}
 
         {state.eq ? (
           <EqualizerPanel
@@ -308,20 +315,46 @@ export function Dashboard({
               onCustomEqChange?.(customEqKey(state.modelName, current.layout), values);
               void headphones.setEqBands({ ...current, values });
             }}
+            profiles={eqProfiles}
+            onApplyProfile={(profile) => {
+              const bands = { layout: profile.layout as EqBands["layout"], values: profile.values };
+              // Applying a saved curve means selecting Custom and sending it, since a named
+              // preset would overwrite the bands with its own.
+              onCustomEqChange?.(customEqKey(state.modelName, bands.layout), profile.values);
+              void headphones.setEqPreset(EqPresetId.CUSTOM, bands);
+            }}
+            onSaveProfile={onSaveEqProfile ?? (() => {})}
+            onDeleteProfile={onDeleteEqProfile ?? (() => {})}
           />
-        ) : (
-          <div />
-        )}
+        ) : null}
+
+        <NowPlaying
+          playback={state.playback}
+          volume={state.volume}
+          codec={state.codec}
+          onPlayPause={() => void headphones.playPause()}
+          onNext={() => void headphones.nextTrack()}
+          onPrevious={() => void headphones.previousTrack()}
+          onVolumeChange={(level) => void headphones.setVolume(level)}
+        />
 
         <SoundSettings
           connectionMode={state.connectionMode}
           upscaling={state.upscaling}
           speakToChat={state.speakToChat}
           pauseOnRemoval={state.pauseOnRemoval}
+          headGesture={state.headGesture}
+          autoPowerOff={state.autoPowerOff}
+          bgmMode={state.bgmMode}
+          upmixCinema={state.upmixCinema}
           onConnectionModeChange={(mode) => void headphones.setConnectionMode(mode)}
           onUpscalingChange={(value) => void headphones.setUpscaling(value)}
           onSpeakToChatChange={(next) => void headphones.setSpeakToChat(next)}
           onPauseOnRemovalChange={(enabled) => void headphones.setPauseOnRemoval(enabled)}
+          onHeadGestureChange={(enabled) => void headphones.setHeadGesture(enabled)}
+          onAutoPowerOffChange={(value) => void headphones.setAutoPowerOff(value)}
+          onBgmModeChange={(next) => void headphones.setBgmMode(next)}
+          onUpmixCinemaChange={(enabled) => void headphones.setUpmixCinema(enabled)}
         />
 
         {/* Flows into the second column beside SOUND & SPEECH rather than spanning the width:

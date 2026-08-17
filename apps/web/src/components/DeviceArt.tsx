@@ -97,7 +97,8 @@ export function DeviceArt({
   color = "var(--fg2)",
 }: {
   model: string | null | undefined;
-  size?: number;
+  /** A number of pixels, or any CSS length — "66%" lets the art track a container that scales. */
+  size?: number | string;
   color?: string;
 }) {
   const family = deviceFamily(model);

@@ -21,6 +21,21 @@
   padding: 0 28px;
 }
 
+/* A measure set for a laptop reads as a narrow strip down the middle of an ultrawide. Give it
+   room on wide displays, but keep a ceiling — prose past roughly this width stops being
+   comfortable to read regardless of how much monitor there is. */
+@media (min-width: 1800px) {
+  .lp {
+    --lp-max: 1280px;
+  }
+}
+
+@media (min-width: 2400px) {
+  .lp {
+    --lp-max: 1420px;
+  }
+}
+
 /* ---------- nav ---------- */
 
 .lp-nav {
@@ -237,9 +252,10 @@
 }
 
 .lp-modes {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 3px;
+  /* No gap: the indicator is exactly a third wide and steps by its own width. */
   padding: 3px;
   border-radius: 10px;
   background: var(--track);
@@ -247,7 +263,54 @@
   max-width: 460px;
 }
 
+/* One indicator that slides to the chosen mode, so switching reads as the same object moving
+   rather than three cells lighting up in turn. It carries the border, without which the muted
+   "Off" state is nearly invisible against the track. */
+.lp-mode-thumb {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc((100% - 6px) / 3);
+  border-radius: 8px;
+  border: 1px solid var(--fg2);
+  background: var(--panel2);
+  box-shadow: 0 6px 14px -8px rgb(0 0 0 / 0.85), 0 1px 0 0 rgb(255 255 255 / 0.04) inset;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), background 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.lp-mode-thumb[data-index="0"] {
+  transform: translateX(0);
+}
+.lp-mode-thumb[data-index="1"] {
+  transform: translateX(100%);
+}
+.lp-mode-thumb[data-index="2"] {
+  transform: translateX(200%);
+}
+
+.lp-mode-thumb[data-tone="accent"] {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent-soft) 70%, var(--panel));
+}
+
+.lp-mode-thumb[data-tone="amber"] {
+  border-color: var(--amber);
+  background: color-mix(in srgb, var(--amber-soft) 70%, var(--panel));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-mode-thumb {
+    transition: background 0.2s ease, border-color 0.2s ease;
+  }
+}
+
 .lp-mode {
+  /* Above the indicator: it is absolutely positioned, so without a stacking context of their
+     own the labels get painted over by it. */
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -268,19 +331,6 @@
 
 .lp-mode:hover:not([aria-checked="true"]) {
   color: var(--fg2);
-  background: color-mix(in srgb, var(--panel2) 60%, transparent);
-}
-
-.lp-mode[aria-checked="true"] {
-  background: var(--panel);
-  transform: translateY(-1px);
-  box-shadow: 0 6px 14px -8px rgb(0 0 0 / 0.85), 0 1px 0 0 rgb(255 255 255 / 0.04) inset;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .lp-mode[aria-checked="true"] {
-    transform: none;
-  }
 }
 
 .lp-mode-label {
@@ -295,21 +345,17 @@
   opacity: 0.66;
 }
 
-/* Tone only tints the raised button — the lift and the surface come from the rule above, so
-   each mode keeps its own colour without going back to being an outlined box. */
+/* The indicator carries the surface, so a selected cell only changes its label colour. */
 .lp-mode[aria-checked="true"][data-tone="accent"] {
-  background: color-mix(in srgb, var(--accent-soft) 70%, var(--panel));
   color: var(--accent);
 }
 
 .lp-mode[aria-checked="true"][data-tone="amber"] {
-  background: color-mix(in srgb, var(--amber-soft) 70%, var(--panel));
   color: var(--amber);
 }
 
 .lp-mode[aria-checked="true"][data-tone="mute"] {
-  background: var(--panel2);
-  color: var(--fg2);
+  color: var(--fg);
 }
 
 .lp-wire-caption {

@@ -190,6 +190,12 @@ function WireInspector() {
 
       <div className="lp-wire-body">
         <div className="lp-modes" role="radiogroup" aria-label="Demo noise control mode">
+          <div
+            className="lp-mode-thumb"
+            aria-hidden="true"
+            data-index={MODES.findIndex((m) => m.id === mode)}
+            data-tone={MODES.find((m) => m.id === mode)?.tone}
+          />
           {MODES.map((m) => (
             <button
               key={m.id}

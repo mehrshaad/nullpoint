@@ -68,6 +68,12 @@ export enum CommandT1 {
   /** Pushed by the headset when the charge level changes, without being asked. */
   POWER_NTFY_STATUS = 0x25,
 
+  /** Auto power off lives here, separate from the battery status above. */
+  POWER_GET_PARAM = 0x26,
+  POWER_RET_PARAM = 0x27,
+  POWER_SET_PARAM = 0x28,
+  POWER_NTFY_PARAM = 0x29,
+
   EQEBB_GET_PARAM = 0x56,
   EQEBB_RET_PARAM = 0x57,
   EQEBB_SET_PARAM = 0x58,
@@ -77,6 +83,21 @@ export enum CommandT1 {
   NCASM_RET_PARAM = 0x67,
   NCASM_SET_PARAM = 0x68,
   NCASM_NTFY_PARAM = 0x69,
+
+  /** Which codec is actually in use. ProtocolV2T1.h:33-41 */
+  COMMON_GET_STATUS = 0x12,
+  COMMON_RET_STATUS = 0x13,
+  COMMON_NTFY_STATUS = 0x15,
+
+  /** Transport controls and volume. ProtocolV2T1.h:142-153 */
+  PLAY_GET_STATUS = 0xa2,
+  PLAY_RET_STATUS = 0xa3,
+  PLAY_SET_STATUS = 0xa4,
+  PLAY_NTFY_STATUS = 0xa5,
+  PLAY_GET_PARAM = 0xa6,
+  PLAY_RET_PARAM = 0xa7,
+  PLAY_SET_PARAM = 0xa8,
+  PLAY_NTFY_PARAM = 0xa9,
 
   /** Connection quality and DSEE upscaling live here. ProtocolV2T1.h:182-192 */
   AUDIO_GET_PARAM = 0xe6,
@@ -99,13 +120,68 @@ export enum CommandT1 {
 export enum AudioInquiredType {
   CONNECTION_MODE = 0x00,
   UPSCALING = 0x01,
+  BGM_MODE = 0x03,
+  UPMIX_CINEMA = 0x04,
+  /** Same payload as BGM_MODE; headsets advertising 0xEB answer on this one. */
+  BGM_MODE_AND_ERRORCODE = 0x09,
 }
 
-/** ProtocolV2T1.h:5595-5638 (subset). */
+/** ProtocolV2T1.h:755-768 (subset). */
+export enum CommonInquiredType {
+  AUDIO_CODEC = 0x02,
+}
+
+/**
+ * The codec actually carrying audio right now — the thing people argue about and rarely get to
+ * verify. ProtocolV2T1.h:855-865.
+ */
+export enum AudioCodec {
+  UNSETTLED = 0x00,
+  SBC = 0x01,
+  AAC = 0x02,
+  LDAC = 0x10,
+  APT_X = 0x20,
+  APT_X_HD = 0x21,
+  LC3 = 0x30,
+  OTHER = 0xff,
+}
+
+/** ProtocolV2T1.h:3722-3739 (subset). */
+export enum PlayInquiredType {
+  PLAYBACK_CONTROL_WITH_CALL_VOLUME_ADJUSTMENT = 0x01,
+  MUSIC_VOLUME = 0x20,
+}
+
+/** ProtocolV2T1.h:3775-3781 */
+export enum PlaybackStatus {
+  UNSETTLED = 0x00,
+  PLAY = 0x01,
+  PAUSE = 0x02,
+  STOP = 0x03,
+}
+
+/** What to ask the source device to do. ProtocolV2T1.h:3813-3825 (subset). */
+export enum PlaybackControl {
+  PAUSE = 0x01,
+  TRACK_UP = 0x02,
+  TRACK_DOWN = 0x03,
+  PLAY = 0x07,
+}
+
+/** How far away background music is placed. ProtocolV2T1.h:4945-4950 */
+export enum RoomSize {
+  SMALL = 0x00,
+  MIDDLE = 0x01,
+  LARGE = 0x02,
+}
+
+/** ProtocolV2T1.h:5595-5651 (subset). */
 export enum SystemInquiredType {
   /** "Pause when you take them off" — wear detection driving playback. */
   PLAYBACK_CONTROL_BY_WEARING = 0x01,
   SMART_TALKING_MODE_TYPE2 = 0x0c,
+  /** Nod to accept a call, shake to decline. */
+  HEAD_GESTURE_ON_OFF = 0x0f,
 }
 
 /**
@@ -207,6 +283,7 @@ export enum DeviceInfoType {
  * Constants.h:178-290 (MessageMdrV2FunctionType_Table1).
  */
 export enum FunctionTypeT1 {
+  CODEC_INDICATOR = 0x12,
   BATTERY_LEVEL_INDICATOR = 0x20,
   LEFT_RIGHT_BATTERY_LEVEL_INDICATOR = 0x21,
   CRADLE_BATTERY_LEVEL_INDICATOR = 0x22,
@@ -220,10 +297,16 @@ export enum FunctionTypeT1 {
   MODE_NC_ASM_NOISE_CANCELLING_DUAL_AMBIENT_SOUND_MODE_LEVEL_ADJUSTMENT = 0x6b,
   MODE_NC_ASM_NOISE_CANCELLING_DUAL_AMBIENT_SOUND_MODE_LEVEL_ADJUSTMENT_NOISE_ADAPTATION = 0x6d,
   POWER_OFF = 0x23,
+  AUTO_POWER_OFF_WITH_WEARING_DETECTION = 0x25,
+  PLAYBACK_CONTROLLER_WITH_CALL_VOLUME_ADJUSTMENT = 0xa1,
   CONNECTION_MODE_SOUND_QUALITY_CONNECTION_QUALITY = 0xe1,
   UPSCALING_AUTO_OFF = 0xe2,
+  UPMIX_CINEMA = 0xe5,
+  LISTENING_OPTION = 0xe6,
+  BGM_MODE_SMALL_MIDDLE_LARGE_AND_ERRORCODE = 0xeb,
   PLAYBACK_CONTROL_BY_WEARING_REMOVING_HEADPHONE_ON_OFF = 0xf1,
   SMART_TALKING_MODE_TYPE2 = 0xfc,
+  HEAD_GESTURE_ON_OFF_TRAINING = 0xff,
 }
 
 /** ProtocolV2T1.h:2120-2136 */
@@ -272,7 +355,24 @@ export enum PowerInquiredType {
   LEFT_RIGHT_BATTERY = 0x01,
   CRADLE_BATTERY = 0x02,
   POWER_OFF = 0x03,
+  AUTO_POWER_OFF = 0x04,
+  AUTO_POWER_OFF_WEARING_DETECTION = 0x05,
   BATTERY_WITH_THRESHOLD = 0x08,
+}
+
+/**
+ * When the headphones switch themselves off. ProtocolV2T1.h:1415-1424. The values are not a
+ * scale — `WHEN_REMOVED` waits until you take them off rather than counting idle minutes, and
+ * `DISABLE` never powers down at all.
+ */
+export enum AutoPowerOff {
+  AFTER_5_MIN = 0x00,
+  AFTER_30_MIN = 0x01,
+  AFTER_60_MIN = 0x02,
+  AFTER_180_MIN = 0x03,
+  AFTER_15_MIN = 0x04,
+  WHEN_REMOVED = 0x10,
+  DISABLED = 0x11,
 }
 
 /**

@@ -9,7 +9,10 @@
   --track: #1d2126;
   --fg: #e7e9ec;
   --fg2: #9ba2ab;
-  --fg3: #6b727c;
+  /* Hints and captions. Was #6b727c, which measured 3.8:1 against --panel — under the 4.5:1
+     readable threshold, and used at 10-11px where it matters most. Now 5.3:1, still clearly a
+     step below --fg2 so the hierarchy survives. */
+  --fg3: #838a94;
   --stripe: #2a2f36;
   --accent: #6ea6ef;
   --accent-soft: rgba(110, 166, 239, 0.14);
@@ -33,7 +36,8 @@
   --track: #e4e4df;
   --fg: #17191c;
   --fg2: #565c64;
-  --fg3: #878d95;
+  /* Same correction on light: #878d95 was 3.35:1 on white, this is 4.6:1. */
+  --fg3: #6f757e;
   --stripe: #dcdcd6;
   --accent: #2c6bc9;
   --accent-soft: rgba(44, 107, 201, 0.1);
@@ -78,6 +82,62 @@ a:hover {
   text-decoration: underline;
 }
 
+/* Screens fade and settle rather than cutting, so moving between the dashboard and settings
+   reads as one surface changing instead of a hard swap. Short enough not to feel sluggish on a
+   control you open and close constantly. */
+@keyframes screen-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.screen {
+  height: 100%;
+  animation: screen-in 0.22s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .screen {
+    animation: none;
+  }
+  /* Collapsing sections snap rather than slide when motion is unwelcome. */
+  .dashboard-grid * {
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* The one control in the window chrome. Weighted enough to read as a button, quiet enough not
+   to compete with the wordmark beside it. */
+.titlebar-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg2);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  padding: 5px 11px;
+  transition: color 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+}
+
+.titlebar-action:hover:not(:disabled) {
+  color: var(--fg);
+  background: var(--panel2);
+  border-color: var(--line);
+}
+
+.titlebar-action:disabled {
+  color: var(--fg3);
+  font-weight: 500;
+}
+
 button {
   font-family: inherit;
   cursor: pointer;
@@ -85,21 +145,32 @@ button {
 
 /* design §5.3 rule 4 "Responsive floor" — below 760px the dashboard stacks
    NOISE CONTROL above EQUALIZER instead of the side-by-side two-column grid. */
+/* Columns, filled independently — each panel is exactly as tall as its contents instead of
+   being stretched to match whatever sits beside it. A short PLAYBACK panel next to a long
+   SOUND & SPEECH used to become a mostly-empty box.
+   CSS columns rather than grid because this is the one layout primitive that packs blocks of
+   differing heights without leaving a hole under the short one. */
+/* A column *width* rather than a count: the browser fits as many as the space allows and drops
+   to one when it can't. Fixing the count instead made narrow windows keep two columns and
+   overflow sideways, and horizontal scroll on a settings panel is always a bug.
+   The second value caps it at three — past that the panels stretch and the eye has too far to
+   travel across an ultrawide. */
 .dashboard-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  columns: 340px 3;
+  column-gap: 14px;
+  /* Nothing here should ever scroll sideways; if a panel can't fit, it wraps or clips. */
+  overflow-x: hidden;
 }
-/* Grid items default to min-width:auto, so one panel with wide unbreakable content stretches
-   its whole track and pushes the page into horizontal scroll — which reads as every panel
-   being clipped, not as the one panel being too wide. Let tracks shrink instead. */
+
+/* Panels must not be split down the middle by a column break. */
 .dashboard-grid > * {
   min-width: 0;
+  break-inside: avoid;
+  /* `break-inside` alone is ignored by some engines in multicol; this is the belt to its braces. */
+  page-break-inside: avoid;
+  margin-bottom: 14px;
 }
-@media (max-width: 760px) {
-  .dashboard-grid {
-    grid-template-columns: 1fr;
-  }
-}
+
 
 /* Every screen needs an upper width bound as well as a lower one: on an ultrawide, content
    would otherwise stretch the full width of the display and strand the controls in dead space.
@@ -115,6 +186,27 @@ button {
   width: 100%;
   max-width: 880px;
   margin-inline: auto;
+}
+
+/* A cap tuned for a laptop leaves an ultrawide looking like a narrow strip adrift in the middle
+   of the screen. Above these widths there is room for the panels to breathe without the
+   stretching the cap exists to prevent. */
+@media (min-width: 1800px) {
+  .measure {
+    max-width: 1440px;
+  }
+  .measure-narrow {
+    max-width: 1000px;
+  }
+}
+
+@media (min-width: 2400px) {
+  .measure {
+    max-width: 1640px;
+  }
+  .measure-narrow {
+    max-width: 1120px;
+  }
 }
 
 /* Horizontal padding that shrinks with the viewport, so the centred screens stay usable on a

@@ -83,6 +83,12 @@ export type ConnectionStatus =
 // — a phone holding the control channel — resolves on its own minutes later.
 const RECONNECT_BASE_MS = 1500;
 const RECONNECT_MAX_MS = 15_000;
+/**
+ * Taking a busy channel back is a race, not a wait: you win it by asking at a moment the other
+ * device isn't holding it. Backing off to fifteen seconds lost that race almost every time, so
+ * this case keeps knocking. One socket open every couple of seconds costs nothing.
+ */
+const RECONNECT_BUSY_MAX_MS = 2500;
 
 /** The headset is reachable but its control channel is taken (see PROTOCOL.md, 0x2740). */
 function isChannelBusy(err: unknown): boolean {
@@ -153,10 +159,20 @@ export function useHeadphones({ autoReconnect = true }: { autoReconnect?: boolea
           setConnection({ status: "connected" });
           return;
         } catch (err) {
-          // Back off so a long wait costs almost nothing, and say which kind of wait it is.
-          reason = isChannelBusy(err) ? "busy" : "gone";
+          const next: "busy" | "gone" = isChannelBusy(err) ? "busy" : "gone";
+          // Start over on the delay whenever the situation changes — a headset that just came
+          // back should not inherit the long wait from when it was missing.
+          if (next !== reason) delay = RECONNECT_BASE_MS;
+          reason = next;
           setConnection({ status: "reconnecting", reason });
-          delay = Math.min(Math.round(delay * 1.6), RECONNECT_MAX_MS);
+          // The two cases want opposite behaviour. "Gone" means nothing is listening, so back
+          // off; retrying quickly at a headset that is switched off just burns battery. "Busy"
+          // means it is right there and something else is holding the channel — and that is a
+          // race you win by asking often, so keep the interval short and stop compounding.
+          delay =
+            reason === "busy"
+              ? Math.min(Math.round(delay * 1.25), RECONNECT_BUSY_MAX_MS)
+              : Math.min(Math.round(delay * 1.6), RECONNECT_MAX_MS);
         }
       }
     },
@@ -166,6 +182,41 @@ export function useHeadphones({ autoReconnect = true }: { autoReconnect?: boolea
   useEffect(() => {
     attemptReconnectRef.current = attemptReconnect;
   }, [attemptReconnect]);
+
+  /** How many previously-granted ports exist, so the UI knows whether to offer reconnection. */
+  const [grantedPorts, setGrantedPorts] = useState(0);
+  useEffect(() => {
+    if (!WebSerialTransport.isSupported()) return;
+    void WebSerialTransport.grantedPortCount().then(setGrantedPorts);
+  }, [connection.status]);
+
+  /**
+   * Connect without Chrome's device chooser, using a port the user already permitted.
+   *
+   * Granted ports carry no identity, so the only way to find the right one is to try them in
+   * turn — several entries can point at the same headset, and stale ones fail fast at open().
+   * The first that completes a handshake is the one.
+   */
+  const reconnectKnown = useCallback(async () => {
+    setConnection({ status: "connecting" });
+    setControlLost(false);
+    const ports = await WebSerialTransport.grantedPorts();
+    let lastError: unknown = new Error("No previously connected headphones are reachable.");
+    for (const port of ports) {
+      try {
+        const state = await establish(port);
+        setDeviceState(state);
+        setConnection({ status: "connected" });
+        return;
+      } catch (err) {
+        lastError = err;
+      }
+    }
+    setConnection({
+      status: "failed",
+      message: lastError instanceof Error ? lastError.message : "Unknown error",
+    });
+  }, [establish]);
 
   const connect = useCallback(async () => {
     setConnection({ status: "connecting" });
@@ -193,5 +244,14 @@ export function useHeadphones({ autoReconnect = true }: { autoReconnect?: boolea
     headphonesRef.current = null;
   }, []);
 
-  return { connection, deviceState, controlLost, connect, reset, headphones: headphonesRef.current };
+  return {
+    connection,
+    deviceState,
+    controlLost,
+    connect,
+    reconnectKnown,
+    grantedPorts,
+    reset,
+    headphones: headphonesRef.current,
+  };
 }

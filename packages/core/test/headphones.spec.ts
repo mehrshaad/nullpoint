@@ -2,12 +2,20 @@ import { describe, expect, it } from "vitest";
 import { Headphones } from "../src/headphones.js";
 import { LoopbackTransport } from "../src/transport.js";
 import { decodeFrameBody, packageDataForBt } from "../src/framing.js";
+import { MAX_VOLUME, codecLabel } from "../src/payloads/playback.js";
 import {
   CommandT1,
   CommandT2,
   ConnectInquiredType,
   ConnectivityActionType,
   AudioInquiredType,
+  AudioCodec,
+  AutoPowerOff,
+  CommonInquiredType,
+  PlayInquiredType,
+  PlaybackControl,
+  PlaybackStatus,
+  RoomSize,
   SystemInquiredType,
   EnableDisable,
   FunctionTypeT1,
@@ -93,6 +101,14 @@ function createFakeDevice({
     stcTimeout: ModeOutTime.MID as number,
     pauseOnRemoval: true,
     poweredOff: false,
+    headGesture: false,
+    autoPowerOff: AutoPowerOff.AFTER_30_MIN as number,
+    bgmEnabled: false,
+    bgmRoom: RoomSize.MIDDLE as number,
+    upmixCinema: false,
+    codec: AudioCodec.LDAC as number,
+    playing: false,
+    volume: 12,
     eqPreset: EqPresetId.CUSTOM as number,
     eqSteps: [13, 12, 10, 8, 13, 15],
     // Which paired devices are currently connected. Mutated by connect/disconnect so the
@@ -185,6 +201,13 @@ function createFakeDevice({
                 FunctionTypeT1.SMART_TALKING_MODE_TYPE2,
                 FunctionTypeT1.PLAYBACK_CONTROL_BY_WEARING_REMOVING_HEADPHONE_ON_OFF,
                 FunctionTypeT1.POWER_OFF,
+                FunctionTypeT1.HEAD_GESTURE_ON_OFF_TRAINING,
+                FunctionTypeT1.AUTO_POWER_OFF_WITH_WEARING_DETECTION,
+                // As a WH-1000XM6 does: the error-code BGM variant, not the plain one.
+                FunctionTypeT1.BGM_MODE_SMALL_MIDDLE_LARGE_AND_ERRORCODE,
+                FunctionTypeT1.UPMIX_CINEMA,
+                FunctionTypeT1.CODEC_INDICATOR,
+                FunctionTypeT1.PLAYBACK_CONTROLLER_WITH_CALL_VOLUME_ADJUSTMENT,
               ]
             : []),
         ];
@@ -200,18 +223,102 @@ function createFakeDevice({
         break;
       }
 
-      case CommandT1.AUDIO_GET_PARAM:
+      case CommandT1.AUDIO_GET_PARAM: {
+        const type = payload[1]!;
+        if (type === AudioInquiredType.BGM_MODE_AND_ERRORCODE || type === AudioInquiredType.BGM_MODE) {
+          replies.push(
+            mdr([
+              CommandT1.AUDIO_RET_PARAM,
+              type,
+              state.bgmEnabled ? EnableDisable.ENABLE : EnableDisable.DISABLE,
+              state.bgmRoom,
+            ])
+          );
+          break;
+        }
+        if (type === AudioInquiredType.UPMIX_CINEMA) {
+          replies.push(
+            mdr([
+              CommandT1.AUDIO_RET_PARAM,
+              type,
+              state.upmixCinema ? EnableDisable.ENABLE : EnableDisable.DISABLE,
+            ])
+          );
+          break;
+        }
         replies.push(
           mdr([
             CommandT1.AUDIO_RET_PARAM,
-            payload[1]!,
-            payload[1] === AudioInquiredType.CONNECTION_MODE ? state.connectionMode : state.upscaling,
+            type,
+            type === AudioInquiredType.CONNECTION_MODE ? state.connectionMode : state.upscaling,
           ])
         );
         break;
-      case CommandT1.AUDIO_SET_PARAM:
-        if (payload[1] === AudioInquiredType.CONNECTION_MODE) state.connectionMode = payload[2]!;
-        else state.upscaling = payload[2]!;
+      }
+      case CommandT1.AUDIO_SET_PARAM: {
+        const type = payload[1]!;
+        if (type === AudioInquiredType.BGM_MODE_AND_ERRORCODE || type === AudioInquiredType.BGM_MODE) {
+          state.bgmEnabled = payload[2] === EnableDisable.ENABLE;
+          state.bgmRoom = payload[3]!;
+        } else if (type === AudioInquiredType.UPMIX_CINEMA) {
+          state.upmixCinema = payload[2] === EnableDisable.ENABLE;
+        } else if (type === AudioInquiredType.CONNECTION_MODE) {
+          state.connectionMode = payload[2]!;
+        } else {
+          state.upscaling = payload[2]!;
+        }
+        break; // ACK only
+      }
+
+      case CommandT1.COMMON_GET_STATUS:
+        replies.push(mdr([CommandT1.COMMON_RET_STATUS, CommonInquiredType.AUDIO_CODEC, state.codec]));
+        break;
+
+      case CommandT1.PLAY_GET_STATUS:
+        replies.push(
+          mdr([
+            CommandT1.PLAY_RET_STATUS,
+            PlayInquiredType.PLAYBACK_CONTROL_WITH_CALL_VOLUME_ADJUSTMENT,
+            EnableDisable.ENABLE,
+            state.playing ? PlaybackStatus.PLAY : PlaybackStatus.PAUSE,
+            0,
+          ])
+        );
+        break;
+      case CommandT1.PLAY_SET_STATUS: {
+        const control = payload[3];
+        if (control === PlaybackControl.PLAY) state.playing = true;
+        if (control === PlaybackControl.PAUSE) state.playing = false;
+        replies.push(
+          mdr([
+            CommandT1.PLAY_NTFY_STATUS,
+            PlayInquiredType.PLAYBACK_CONTROL_WITH_CALL_VOLUME_ADJUSTMENT,
+            EnableDisable.ENABLE,
+            state.playing ? PlaybackStatus.PLAY : PlaybackStatus.PAUSE,
+            0,
+          ])
+        );
+        break;
+      }
+      case CommandT1.PLAY_GET_PARAM:
+        replies.push(mdr([CommandT1.PLAY_RET_PARAM, PlayInquiredType.MUSIC_VOLUME, state.volume]));
+        break;
+      case CommandT1.PLAY_SET_PARAM:
+        state.volume = payload[2]!;
+        break; // ACK only
+
+      case CommandT1.POWER_GET_PARAM:
+        replies.push(
+          mdr([
+            CommandT1.POWER_RET_PARAM,
+            PowerInquiredType.AUTO_POWER_OFF_WEARING_DETECTION,
+            state.autoPowerOff,
+            AutoPowerOff.AFTER_5_MIN,
+          ])
+        );
+        break;
+      case CommandT1.POWER_SET_PARAM:
+        state.autoPowerOff = payload[2]!;
         break; // ACK only
 
       case CommandT1.SYSTEM_GET_PARAM:
@@ -221,6 +328,16 @@ function createFakeDevice({
               CommandT1.SYSTEM_RET_PARAM,
               SystemInquiredType.PLAYBACK_CONTROL_BY_WEARING,
               state.pauseOnRemoval ? EnableDisable.ENABLE : EnableDisable.DISABLE,
+            ])
+          );
+          break;
+        }
+        if (payload[1] === SystemInquiredType.HEAD_GESTURE_ON_OFF) {
+          replies.push(
+            mdr([
+              CommandT1.SYSTEM_RET_PARAM,
+              SystemInquiredType.HEAD_GESTURE_ON_OFF,
+              state.headGesture ? EnableDisable.ENABLE : EnableDisable.DISABLE,
             ])
           );
           break;
@@ -238,6 +355,8 @@ function createFakeDevice({
       case CommandT1.SYSTEM_SET_PARAM:
         if (payload[1] === SystemInquiredType.PLAYBACK_CONTROL_BY_WEARING) {
           state.pauseOnRemoval = payload[2] === EnableDisable.ENABLE;
+        } else if (payload[1] === SystemInquiredType.HEAD_GESTURE_ON_OFF) {
+          state.headGesture = payload[2] === EnableDisable.ENABLE;
         } else {
           state.stcEnabled = payload[2] === EnableDisable.ENABLE;
         }
@@ -446,9 +565,37 @@ describe("Headphones.connect() over a fake device", () => {
 
     expect(hp.state.ncAsm).toEqual(before); // reverted, not left on the optimistic guess
     expect(events).toContain("writeFailed");
+    // One miss is not yet evidence the channel is gone — the value reverts, but the app does
+    // not announce anything, because a single stall usually fixes itself.
+    expect(events).not.toContain("controlLost");
+    expect(hp.controllable).toBe(true);
+
+    // A second miss corroborates it.
+    await hp.setNoiseMode("ambient");
     expect(events).toContain("controlLost");
     expect(hp.controllable).toBe(false);
-  }, 20_000);
+  }, 40_000);
+
+  it("says nothing about a stall that fixes itself", async () => {
+    // The failure mode this replaces: one unanswered command disabled the whole dashboard, so
+    // a momentary stall made the UI flicker between usable and disabled.
+    let deaf = false;
+    const device = createFakeDevice();
+    const transport = new LoopbackTransport((sent) => (deaf ? [] : device(sent)));
+    const hp = new Headphones(transport);
+    await hp.connect();
+
+    const events: string[] = [];
+    hp.on((e) => events.push(e.type));
+
+    deaf = true;
+    await hp.setNoiseMode("ambient"); // one miss
+    deaf = false;
+    await hp.setNoiseMode("anc"); // and it answers again
+
+    expect(events).not.toContain("controlLost");
+    expect(hp.controllable).toBe(true);
+  }, 40_000);
 
   it("ignores an in-flight frame so a freshly chosen mode does not snap back", async () => {
     const transport = new LoopbackTransport(createFakeDevice());
@@ -516,7 +663,9 @@ describe("Headphones.connect() over a fake device", () => {
     hp.on((e) => events.push(e.type));
 
     deaf = true;
-    await hp.setNoiseMode("ambient"); // fails, flips to control-lost and starts fast probing
+    // Two misses: the first starts fast probing quietly, the second declares control lost.
+    await hp.setNoiseMode("ambient");
+    await hp.setNoiseMode("ambient");
     expect(hp.controllable).toBe(false);
 
     // Two unanswered probes at 4s apart, each taking the full retry budget before failing.
@@ -747,10 +896,141 @@ describe("Headphones.connect() over a fake device", () => {
 
     deaf = true;
     await hp.setUpscaling(UpscalingTypeAutoOff.AUTO);
+    expect(hp.state.upscaling).toBe(UpscalingTypeAutoOff.OFF); // reverted on the first miss
 
-    expect(hp.state.upscaling).toBe(UpscalingTypeAutoOff.OFF);
+    // Control is only declared lost once a second miss corroborates it.
+    await hp.setUpscaling(UpscalingTypeAutoOff.AUTO);
     expect(hp.controllable).toBe(false);
   }, 20_000);
+
+  it("reports the codec actually carrying audio", async () => {
+    const transport = new LoopbackTransport(createFakeDevice({ extras: true }));
+    const hp = new Headphones(transport);
+    const state = await hp.connect();
+
+    expect(state.codec).toBe(AudioCodec.LDAC);
+    expect(codecLabel(AudioCodec.LDAC)).toBe("LDAC");
+    expect(codecLabel(AudioCodec.APT_X_HD)).toBe("aptX HD");
+  }, 30_000);
+
+  it("relays play and pause to whichever device is playing", async () => {
+    const transport = new LoopbackTransport(createFakeDevice({ extras: true }));
+    const hp = new Headphones(transport);
+    await hp.connect();
+    expect(hp.state.playback).toEqual({ playing: false, available: true });
+
+    await hp.playPause();
+    expect(hp.state.playback?.playing).toBe(true);
+
+    // Pressing it again pauses — the command sent depends on what is happening now, so a stale
+    // reading would send play twice and appear stuck.
+    await hp.playPause();
+    expect(hp.state.playback?.playing).toBe(false);
+
+    const sets = transport.sent
+      .map((f) => decodeFrameBody(f.subarray(1, f.length - 1)))
+      .filter((f) => f.payload[0] === CommandT1.PLAY_SET_STATUS)
+      .map((f) => f.payload[3]);
+    expect(sets).toEqual([PlaybackControl.PLAY, PlaybackControl.PAUSE]);
+  }, 30_000);
+
+  it("skips tracks and sets volume, clamped to the headset's range", async () => {
+    const transport = new LoopbackTransport(createFakeDevice({ extras: true }));
+    const hp = new Headphones(transport);
+    await hp.connect();
+    expect(hp.state.volume).toBe(12);
+
+    await hp.nextTrack();
+    await hp.previousTrack();
+    await hp.setVolume(99); // past the top of the range
+
+    const controls = transport.sent
+      .map((f) => decodeFrameBody(f.subarray(1, f.length - 1)))
+      .filter((f) => f.payload[0] === CommandT1.PLAY_SET_STATUS)
+      .map((f) => f.payload[3]);
+    expect(controls).toEqual([PlaybackControl.TRACK_UP, PlaybackControl.TRACK_DOWN]);
+
+    const volumes = transport.sent
+      .map((f) => decodeFrameBody(f.subarray(1, f.length - 1)))
+      .filter((f) => f.payload[0] === CommandT1.PLAY_SET_PARAM);
+    expect(volumes[volumes.length - 1]!.payload[2]).toBe(MAX_VOLUME);
+  }, 30_000);
+
+  it("reads auto power off, background music and head gestures", async () => {
+    const transport = new LoopbackTransport(createFakeDevice({ extras: true }));
+    const hp = new Headphones(transport);
+    const state = await hp.connect();
+
+    expect(state.autoPowerOff).toBe(AutoPowerOff.AFTER_30_MIN);
+    expect(state.bgmMode).toEqual({ enabled: false, room: RoomSize.MIDDLE });
+    expect(state.upmixCinema).toBe(false);
+    expect(state.headGesture).toBe(false);
+  }, 30_000);
+
+  it("asks for background music on the variant the headset advertises", async () => {
+    // A WH-1000XM6 reports the error-code form (0xEB), which answers on inquired type 0x09.
+    // Asking on the plain 0x03 gets no reply and the panel silently stays empty.
+    const transport = new LoopbackTransport(createFakeDevice({ extras: true }));
+    const hp = new Headphones(transport);
+    await hp.connect();
+
+    const asked = transport.sent
+      .map((f) => decodeFrameBody(f.subarray(1, f.length - 1)))
+      .filter((f) => f.payload[0] === CommandT1.AUDIO_GET_PARAM)
+      .map((f) => f.payload[1]);
+    expect(asked).toContain(AudioInquiredType.BGM_MODE_AND_ERRORCODE);
+    expect(asked).not.toContain(AudioInquiredType.BGM_MODE);
+  }, 30_000);
+
+  it("writes auto power off with a real duration to fall back to", async () => {
+    // The trailing byte is what the headset restores when a timeout is re-enabled, so sending
+    // the current value would make "never" the thing it falls back to.
+    const transport = new LoopbackTransport(createFakeDevice({ extras: true }));
+    const hp = new Headphones(transport);
+    await hp.connect();
+
+    await hp.setAutoPowerOff(AutoPowerOff.DISABLED);
+
+    const sets = transport.sent
+      .map((f) => decodeFrameBody(f.subarray(1, f.length - 1)))
+      .filter((f) => f.payload[0] === CommandT1.POWER_SET_PARAM);
+    expect(sets[sets.length - 1]!.payload[2]).toBe(AutoPowerOff.DISABLED);
+    expect(sets[sets.length - 1]!.payload[3]).toBe(AutoPowerOff.AFTER_5_MIN);
+    expect(hp.state.autoPowerOff).toBe(AutoPowerOff.DISABLED);
+  }, 30_000);
+
+  it("changes background music room size without turning it off", async () => {
+    const transport = new LoopbackTransport(createFakeDevice({ extras: true }));
+    const hp = new Headphones(transport);
+    await hp.connect();
+
+    await hp.setBgmMode({ enabled: true, room: RoomSize.LARGE });
+
+    expect(hp.state.bgmMode).toEqual({ enabled: true, room: RoomSize.LARGE });
+    // ENABLE is 0 on the wire — an inverted write would read back as switched off.
+    const sets = transport.sent
+      .map((f) => decodeFrameBody(f.subarray(1, f.length - 1)))
+      .filter(
+        (f) =>
+          f.payload[0] === CommandT1.AUDIO_SET_PARAM &&
+          f.payload[1] === AudioInquiredType.BGM_MODE_AND_ERRORCODE
+      );
+    expect(sets[sets.length - 1]!.payload[2]).toBe(EnableDisable.ENABLE);
+    expect(sets[sets.length - 1]!.payload[3]).toBe(RoomSize.LARGE);
+  }, 30_000);
+
+  it("tells head gestures apart from the other system settings", async () => {
+    const transport = new LoopbackTransport(createFakeDevice({ extras: true }));
+    const hp = new Headphones(transport);
+    await hp.connect();
+
+    await hp.setHeadGesture(true);
+
+    expect(hp.state.headGesture).toBe(true);
+    // Three settings share SYSTEM_RET_PARAM; the others must be untouched.
+    expect(hp.state.pauseOnRemoval).toBe(true);
+    expect(hp.state.speakToChat?.enabled).toBe(false);
+  }, 30_000);
 
   it("reads the paired device list, with a kind per Bluetooth Class of Device", async () => {
     const transport = new LoopbackTransport(createFakeDevice({ table2: true }));

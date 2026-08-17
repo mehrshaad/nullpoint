@@ -1,7 +1,7 @@
 import type { HeadphonesState } from "@ssc/core";
 import { Switch } from "../components/Switch.js";
 import { CapabilityReport } from "../components/CapabilityReport.js";
-import type { AppSettings } from "../state/useSettings.js";
+import { ACCENTS, type AccentName, type AppSettings } from "../state/useSettings.js";
 
 const THEMES: Array<AppSettings["theme"]> = ["system", "dark", "light"];
 
@@ -46,7 +46,7 @@ export function Settings({
   const rows = TOGGLE_ROWS.filter((row) => isDesktop || !row.desktopOnly);
 
   return (
-    <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "var(--bg)" }}>
+    <div className="screen" style={{ height: "100%", display: "flex", flexDirection: "column", background: "var(--bg)" }}>
       <div
         style={{
           height: 44,
@@ -149,6 +149,54 @@ export function Settings({
                   >
                     {theme}
                   </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 16,
+              flexWrap: "wrap",
+              padding: "14px 16px",
+              background: "var(--panel)",
+              borderTop: "1px solid var(--line)",
+            }}
+          >
+            <div style={{ flex: "1 1 200px", minWidth: 0 }}>
+              <div style={{ fontWeight: 500, fontSize: 13, color: "var(--fg)" }}>Accent</div>
+              <div className="mono" style={{ marginTop: 4, fontSize: 11, color: "var(--fg3)" }}>
+                {ACCENTS[settings.accent]?.label.toUpperCase() ?? "BLUE"}
+              </div>
+            </div>
+            {/* Swatches rather than names: the colour is the label. */}
+            <div role="radiogroup" aria-label="Accent colour" style={{ display: "flex", gap: 7 }}>
+              {(Object.keys(ACCENTS) as AccentName[]).map((key) => {
+                const on = settings.accent === key;
+                const swatch = ACCENTS[key];
+                return (
+                  <button
+                    key={key}
+                    role="radio"
+                    aria-checked={on}
+                    aria-label={swatch.label}
+                    title={swatch.label}
+                    onClick={() => void update({ accent: key })}
+                    style={{
+                      width: 26,
+                      height: 26,
+                      borderRadius: "50%",
+                      cursor: "pointer",
+                      background: `light-dark(${swatch.light}, ${swatch.dark})`,
+                      // The ring sits outside the swatch so the colour stays a clean circle.
+                      border: "2px solid var(--panel)",
+                      boxShadow: on ? "0 0 0 2px var(--fg2)" : "0 0 0 1px var(--line)",
+                      transition: "box-shadow .18s ease, transform .18s ease",
+                      transform: on ? "scale(1.06)" : "none",
+                    }}
+                  />
                 );
               })}
             </div>

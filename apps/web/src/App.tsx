@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useHeadphones } from "./state/useHeadphones.js";
 import { useSettings } from "./state/useSettings.js";
 import { ConnectIdle } from "./screens/ConnectIdle.js";
@@ -10,10 +10,19 @@ import { Settings } from "./screens/Settings.js";
 
 export function App() {
   const { settings, update, isDesktop } = useSettings();
-  const { connection, deviceState, controlLost, connect, reset, headphones } = useHeadphones({
-    autoReconnect: settings.reconnectAutomatically,
-  });
+  const { connection, deviceState, controlLost, connect, reconnectKnown, grantedPorts, reset, headphones } =
+    useHeadphones({ autoReconnect: settings.reconnectAutomatically });
   const [showSettings, setShowSettings] = useState(false);
+
+  // Remember what connected, so the reconnect button can carry a name. Granted ports have no
+  // identity of their own, so this list is the only source for one.
+  const model = deviceState?.modelName;
+  useEffect(() => {
+    if (!model || settings.knownDevices[0] === model) return;
+    void update({
+      knownDevices: [model, ...settings.knownDevices.filter((d) => d !== model)].slice(0, 4),
+    });
+  }, [model, settings.knownDevices, update]);
 
   if (showSettings) {
     return (
@@ -41,7 +50,14 @@ export function App() {
     case "unsupported":
       return <UnsupportedBrowser />;
     case "idle":
-      return <ConnectIdle onConnect={connect} />;
+      return (
+        <ConnectIdle
+          onConnect={connect}
+          onReconnect={reconnectKnown}
+          knownDevices={settings.knownDevices}
+          grantedPorts={grantedPorts}
+        />
+      );
     case "connecting":
       return <Connecting onCancel={reset} />;
     case "failed":
@@ -61,6 +77,20 @@ export function App() {
           savedCustomEq={settings.customEq}
           onCustomEqChange={(key, values) =>
             void update({ customEq: { ...settings.customEq, [key]: values } })
+          }
+          eqProfiles={settings.eqProfiles}
+          onSaveEqProfile={(name, bands) =>
+            void update({
+              eqProfiles: [
+                ...settings.eqProfiles,
+                // Date-based id: unique enough for a local list, and it keeps them in the order
+                // they were saved without a separate index.
+                { id: `eq-${Date.now()}`, name, layout: bands.layout, values: [...bands.values] },
+              ],
+            })
+          }
+          onDeleteEqProfile={(id) =>
+            void update({ eqProfiles: settings.eqProfiles.filter((p) => p.id !== id) })
           }
           onCancelReconnect={reset}
         />

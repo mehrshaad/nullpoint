@@ -1,12 +1,16 @@
 import type { ReactNode } from "react";
 import {
+  AutoPowerOff,
   DetectSensitivity,
   ModeOutTime,
   PriorMode,
+  RoomSize,
   UpscalingTypeAutoOff,
+  type BgmModeState,
   type SpeakToChatState,
 } from "@ssc/core";
 import { Switch } from "./Switch.js";
+import { Collapse } from "./Collapse.js";
 
 /**
  * The capability-gated extras: connection quality, DSEE upscaling and Speak-to-Chat.
@@ -86,23 +90,46 @@ export function SoundSettings({
   upscaling,
   speakToChat,
   pauseOnRemoval,
+  headGesture,
+  autoPowerOff,
+  bgmMode,
+  upmixCinema,
   onConnectionModeChange,
   onUpscalingChange,
   onSpeakToChatChange,
   onPauseOnRemovalChange,
+  onHeadGestureChange,
+  onAutoPowerOffChange,
+  onBgmModeChange,
+  onUpmixCinemaChange,
 }: {
   connectionMode: PriorMode | null;
   upscaling: UpscalingTypeAutoOff | null;
   speakToChat: SpeakToChatState | null;
   pauseOnRemoval: boolean | null;
+  headGesture: boolean | null;
+  autoPowerOff: AutoPowerOff | null;
+  bgmMode: BgmModeState | null;
+  upmixCinema: boolean | null;
   onConnectionModeChange: (mode: PriorMode) => void;
   onUpscalingChange: (value: UpscalingTypeAutoOff) => void;
   onSpeakToChatChange: (next: SpeakToChatState) => void;
   onPauseOnRemovalChange: (enabled: boolean) => void;
+  onHeadGestureChange: (enabled: boolean) => void;
+  onAutoPowerOffChange: (value: AutoPowerOff) => void;
+  onBgmModeChange: (next: BgmModeState) => void;
+  onUpmixCinemaChange: (enabled: boolean) => void;
 }) {
-  if (connectionMode === null && upscaling === null && speakToChat === null && pauseOnRemoval === null) {
-    return null;
-  }
+  const anything =
+    connectionMode !== null ||
+    upscaling !== null ||
+    speakToChat !== null ||
+    pauseOnRemoval !== null ||
+    headGesture !== null ||
+    autoPowerOff !== null ||
+    bgmMode !== null ||
+    upmixCinema !== null;
+  if (!anything) return null;
 
   return (
     <div
@@ -148,9 +175,64 @@ export function SoundSettings({
         </Row>
       )}
 
+      {bgmMode && (
+        <>
+          <Row label="Background music" hint="Places the music around you, not in your head">
+            <Switch
+              checked={bgmMode.enabled}
+              onChange={(enabled) => onBgmModeChange({ ...bgmMode, enabled })}
+              ariaLabel="Background music"
+            />
+          </Row>
+          <Collapse open={bgmMode.enabled} parentGap={16}>
+            <Row label="Room size" hint="How far away it sounds">
+              <Segmented
+                ariaLabel="Room size"
+                value={bgmMode.room}
+                onChange={(room) => onBgmModeChange({ ...bgmMode, room })}
+                options={[
+                  { value: RoomSize.SMALL, label: "SMALL" },
+                  { value: RoomSize.MIDDLE, label: "MEDIUM" },
+                  { value: RoomSize.LARGE, label: "LARGE" },
+                ]}
+              />
+            </Row>
+          </Collapse>
+        </>
+      )}
+
+      {upmixCinema !== null && (
+        <Row label="Cinema upmix" hint="Widens stereo for film soundtracks">
+          <Switch checked={upmixCinema} onChange={onUpmixCinemaChange} ariaLabel="Cinema upmix" />
+        </Row>
+      )}
+
       {pauseOnRemoval !== null && (
         <Row label="Pause when removed" hint="Stops playback when you take them off">
           <Switch checked={pauseOnRemoval} onChange={onPauseOnRemovalChange} ariaLabel="Pause when removed" />
+        </Row>
+      )}
+
+      {headGesture !== null && (
+        <Row label="Head gestures" hint="Nod to answer a call, shake to decline">
+          <Switch checked={headGesture} onChange={onHeadGestureChange} ariaLabel="Head gestures" />
+        </Row>
+      )}
+
+      {autoPowerOff !== null && (
+        <Row label="Switch off when idle" hint="Saves battery when you walk away">
+          <Segmented
+            ariaLabel="Switch off when idle"
+            value={autoPowerOff}
+            onChange={onAutoPowerOffChange}
+            options={[
+              { value: AutoPowerOff.AFTER_5_MIN, label: "5 MIN" },
+              { value: AutoPowerOff.AFTER_30_MIN, label: "30 MIN" },
+              { value: AutoPowerOff.AFTER_180_MIN, label: "3 HR" },
+              { value: AutoPowerOff.WHEN_REMOVED, label: "WHEN OFF EARS" },
+              { value: AutoPowerOff.DISABLED, label: "NEVER" },
+            ]}
+          />
         </Row>
       )}
 
@@ -163,8 +245,8 @@ export function SoundSettings({
               ariaLabel="Speak-to-Chat"
             />
           </Row>
-          {speakToChat.enabled && (
-            <>
+          <Collapse open={speakToChat.enabled} parentGap={16}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 16, paddingTop: 16 }}>
               <Row label="Voice sensitivity" hint="How readily it decides you're speaking">
                 <Segmented
                   ariaLabel="Voice sensitivity"
@@ -190,8 +272,8 @@ export function SoundSettings({
                   ]}
                 />
               </Row>
-            </>
-          )}
+            </div>
+          </Collapse>
         </>
       )}
     </div>

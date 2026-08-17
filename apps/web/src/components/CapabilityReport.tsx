@@ -11,6 +11,8 @@ import { FunctionTypeT1, type HeadphonesState } from "@ssc/core";
 
 /** The function types the app actually acts on, in the order they matter. */
 const TRACKED: Array<{ fn: FunctionTypeT1; label: string }> = [
+  { fn: FunctionTypeT1.CODEC_INDICATOR, label: "Codec indicator" },
+  { fn: FunctionTypeT1.PLAYBACK_CONTROLLER_WITH_CALL_VOLUME_ADJUSTMENT, label: "Playback and volume" },
   { fn: FunctionTypeT1.BATTERY_LEVEL_INDICATOR, label: "Battery level" },
   { fn: FunctionTypeT1.LEFT_RIGHT_BATTERY_LEVEL_INDICATOR, label: "Per-bud battery" },
   { fn: FunctionTypeT1.CRADLE_BATTERY_LEVEL_INDICATOR, label: "Case battery" },
@@ -27,6 +29,11 @@ const TRACKED: Array<{ fn: FunctionTypeT1; label: string }> = [
   { fn: FunctionTypeT1.UPSCALING_AUTO_OFF, label: "DSEE Extreme" },
   { fn: FunctionTypeT1.SMART_TALKING_MODE_TYPE2, label: "Speak-to-Chat" },
   { fn: FunctionTypeT1.PLAYBACK_CONTROL_BY_WEARING_REMOVING_HEADPHONE_ON_OFF, label: "Pause when removed" },
+  { fn: FunctionTypeT1.HEAD_GESTURE_ON_OFF_TRAINING, label: "Head gestures" },
+  { fn: FunctionTypeT1.AUTO_POWER_OFF_WITH_WEARING_DETECTION, label: "Switch off when idle" },
+  { fn: FunctionTypeT1.LISTENING_OPTION, label: "Listening options" },
+  { fn: FunctionTypeT1.BGM_MODE_SMALL_MIDDLE_LARGE_AND_ERRORCODE, label: "Background music" },
+  { fn: FunctionTypeT1.UPMIX_CINEMA, label: "Cinema upmix" },
   { fn: FunctionTypeT1.POWER_OFF, label: "Power off" },
 ];
 

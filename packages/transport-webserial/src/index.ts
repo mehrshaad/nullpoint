@@ -46,10 +46,22 @@ export class WebSerialTransport implements Transport {
 
   /** Ports the user has already granted us, used for diagnostics on the failure screen. */
   static async grantedPortCount(): Promise<number> {
+    return (await WebSerialTransport.grantedPorts()).length;
+  }
+
+  /**
+   * Ports the user has already permitted, which can be opened **without** a user gesture and
+   * without Chrome's device chooser — that is what makes one-click reconnection possible.
+   *
+   * They carry no identity: `getInfo()` returns an empty object for Bluetooth ports, so there
+   * is no name, address or id to match on. The only way to tell which is which is to open one
+   * and ask the headset. Hence `openFirstAvailable` below.
+   */
+  static async grantedPorts(): Promise<SerialPort[]> {
     try {
-      return (await navigator.serial.getPorts()).length;
+      return await navigator.serial.getPorts();
     } catch {
-      return 0;
+      return [];
     }
   }
 
