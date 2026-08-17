@@ -1066,6 +1066,59 @@ describe("Headphones.connect() over a fake device", () => {
     expect(state.headGesture).toBe(false);
   }, 30_000);
 
+  it("sends only the newest volume while the user is still dragging", async () => {
+    // A drag fires on every pointer move. Writing them one for one queues behind an ACK the
+    // headset is slow to send, and the slider ends up chasing a headset several steps behind.
+    const transport = new LoopbackTransport(createFakeDevice({ extras: true }));
+    const hp = new Headphones(transport);
+    await hp.connect();
+
+    const before = transport.sent.length;
+    // Fire a drag's worth of positions without awaiting, as the pointer handler does.
+    const drag = [5, 9, 14, 18, 23, 27].map((v) => hp.setVolume(v));
+    await Promise.all(drag);
+
+    const written = transport.sent
+      .slice(before)
+      .map((f) => decodeFrameBody(f.subarray(1, f.length - 1)))
+      .filter((f) => f.payload[0] === CommandT1.PLAY_SET_PARAM)
+      .map((f) => f.payload[2]);
+
+    // The first goes out immediately and the last must always land; the ones dragged past
+    // in between are dropped rather than queued.
+    expect(written.length).toBeLessThan(6);
+    expect(written[written.length - 1]).toBe(27);
+    expect(hp.state.volume).toBe(27);
+  }, 30_000);
+
+  it("ignores volume the headset echoes back from a position already dragged past", async () => {
+    const transport = new LoopbackTransport(createFakeDevice({ extras: true }));
+    const hp = new Headphones(transport);
+    await hp.connect();
+
+    // Start a write and, before it settles, deliver a stale notification for an older position.
+    const pending = hp.setVolume(25);
+    transport.emit(
+      packageDataForBt(
+        DataType.DATA_MDR,
+        0,
+        Uint8Array.from([CommandT1.PLAY_NTFY_PARAM, PlayInquiredType.MUSIC_VOLUME, 7])
+      )
+    );
+    expect(hp.state.volume).toBe(25);
+    await pending;
+
+    // Once nothing is outstanding the headset is authoritative again — its own buttons work.
+    transport.emit(
+      packageDataForBt(
+        DataType.DATA_MDR,
+        0,
+        Uint8Array.from([CommandT1.PLAY_NTFY_PARAM, PlayInquiredType.MUSIC_VOLUME, 7])
+      )
+    );
+    expect(hp.state.volume).toBe(7);
+  }, 30_000);
+
   it("leaves the spatial upmix picker null on a headset that only has the cinema toggle", async () => {
     // The two are alternatives, and an XM6 has the toggle. Asking a headset for a setting it
     // never claimed gets no answer, so the control has to stay hidden rather than appear empty.

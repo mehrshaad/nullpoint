@@ -411,9 +411,46 @@ export class Headphones {
     }
   }
 
-  /** 0–30. */
+  /**
+   * 0–30.
+   *
+   * Not writeSetting, because volume is the one setting that arrives as a stream rather than a
+   * single decision. A drag fires on every pointer move, and each write waits for an ACK the
+   * headset takes 100-200ms to send, so writing them one for one builds a queue: the slider
+   * ends up chasing a headset that is several steps behind the finger.
+   *
+   * Instead there is one intent — where the user wants the volume — and one writer draining it.
+   * Intermediate positions during a drag are never sent, only the newest, so the wire carries a
+   * couple of writes instead of dozens and the last one is always the value on screen.
+   */
   async setVolume(level: number): Promise<void> {
-    await this.writeSetting("volume", level, () => Playback.encodeSetVolume(level));
+    if (this.state.volume === null) throw new Error("These headphones don't support volume.");
+    // Optimistic without exception: the slider has to track the finger.
+    this.state.volume = level;
+    this.volumeIntent = level;
+    this.emit({ type: "settings" });
+    // A writer is already draining; it will pick up this newer intent when it comes round.
+    if (this.volumeWriting) return;
+
+    this.volumeWriting = true;
+    try {
+      while (this.volumeIntent !== null) {
+        const target: number = this.volumeIntent;
+        try {
+          await this.send(DataType.DATA_MDR, Playback.encodeSetVolume(target));
+          this.noteResponsive();
+        } catch {
+          this.volumeIntent = null;
+          this.emit({ type: "writeFailed", feature: "volume" });
+          this.noteUnanswered();
+          return;
+        }
+        // Only clear if the user hasn't moved on since this write started.
+        if (this.volumeIntent === target) this.volumeIntent = null;
+      }
+    } finally {
+      this.volumeWriting = false;
+    }
   }
 
   /**
@@ -590,6 +627,9 @@ export class Headphones {
     return devices;
   }
 
+  /** Where the user wants the volume, until the wire has caught up with them. See setVolume. */
+  private volumeIntent: number | null = null;
+  private volumeWriting = false;
   private batteryTimer: ReturnType<typeof setInterval> | null = null;
   private hasControl = true;
   private supportsTable2 = false;
@@ -1011,6 +1051,11 @@ export class Headphones {
       case CommandT1.PLAY_NTFY_PARAM: {
         const volume = Playback.decodeVolume(frame.payload);
         if (volume === null) break;
+        // While a write is still outstanding, the headset is reporting positions the user has
+        // already dragged past. Letting those land is what makes the slider feel like it is
+        // pulling backwards. Once our last write has gone out the headset is authoritative
+        // again, which is what keeps its own volume buttons updating the UI instantly.
+        if (this.volumeIntent !== null) break;
         this.state.volume = volume;
         this.emit({ type: "settings" });
         break;
