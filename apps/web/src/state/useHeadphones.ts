@@ -115,6 +115,8 @@ export function useHeadphones({ autoReconnect = true }: { autoReconnect?: boolea
    */
   const [controlLost, setControlLost] = useState(false);
   const headphonesRef = useRef<Headphones | null>(null);
+  /** Held so a session being retired can be detached before it is closed. */
+  const unsubscribeRef = useRef<(() => void) | null>(null);
   const attemptReconnectRef = useRef<(port: SerialPort) => void>(() => {});
   const cancelledRef = useRef(false);
   // Read through a ref so an in-flight connection picks up a settings change without
@@ -123,12 +125,26 @@ export function useHeadphones({ autoReconnect = true }: { autoReconnect?: boolea
   autoReconnectRef.current = autoReconnect;
 
   const establish = useCallback(async (port: SerialPort): Promise<HeadphonesState> => {
+    // Retire the previous session before starting another. Without this, every reconnect left
+    // an orphaned one behind with its battery poll still running — and each poll is a radio
+    // transmission sharing the air with your music, so a couple of leaked sessions turn into a
+    // periodic audio dropout that looks like a Bluetooth fault.
+    //
+    // Unsubscribe first: closing the transport can surface as a disconnect, and a listener from
+    // a session we are deliberately retiring must not kick off a reconnect for it.
+    const previous = headphonesRef.current;
+    const previousUnsubscribe = unsubscribeRef.current;
+    headphonesRef.current = null;
+    unsubscribeRef.current = null;
+    previousUnsubscribe?.();
+    if (previous) await previous.disconnect().catch(() => undefined);
+
     const transport = new WebSerialTransport(port);
     const headphones = new Headphones(transport);
     headphonesRef.current = headphones;
     // Reconnecting produces a new session, so any earlier loss of control no longer applies.
     setControlLost(false);
-    headphones.on((event) => {
+    unsubscribeRef.current = headphones.on((event) => {
       setDeviceState({ ...headphones.state });
       if (event.type === "controlLost") setControlLost(true);
       if (event.type === "controlRegained") setControlLost(false);
@@ -241,7 +257,14 @@ export function useHeadphones({ autoReconnect = true }: { autoReconnect?: boolea
     setControlLost(false);
     setConnection({ status: "idle" });
     setDeviceState(null);
+    // Detach and close rather than just dropping the reference: an abandoned session keeps
+    // polling for battery every minute and keeps the port open, and the headset only has the
+    // one control channel to give.
+    const previous = headphonesRef.current;
+    unsubscribeRef.current?.();
+    unsubscribeRef.current = null;
     headphonesRef.current = null;
+    void previous?.disconnect().catch(() => undefined);
   }, []);
 
   return {
