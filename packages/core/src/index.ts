@@ -10,3 +10,4 @@ export * from "./payloads/peripheral.js";
 export * from "./payloads/audio.js";
 export * from "./payloads/system.js";
 export * from "./payloads/playback.js";
+export * from "./trace.js";

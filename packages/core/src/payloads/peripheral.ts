@@ -6,6 +6,7 @@ import {
   ConnectivityActionType,
   PeripheralInquiredType,
   PeripheralOutcome,
+  SourceSwitchResult,
 } from "../constants.js";
 
 const ADDRESS_LENGTH = 17;
@@ -170,6 +171,59 @@ export function encodeSetDeviceConnection(
     action,
     ...addressBytes,
   ]);
+}
+
+/**
+ * Move the audio to a device that is already connected — the multipoint "make this the one I'm
+ * listening on" that Sony's app makes you fight for. ProtocolV2T2.h:1088-1100:
+ * `[command][SOURCE_SWITCH_CONTROL][address:17 ASCII]`.
+ *
+ * Distinct from connect/disconnect: both devices stay connected, only the audio moves.
+ */
+export function encodeSwitchAudioTo(address: string): Uint8Array {
+  const addressBytes = new TextEncoder().encode(address);
+  if (addressBytes.length !== ADDRESS_LENGTH) {
+    throw new Error(`Bluetooth address must be exactly ${ADDRESS_LENGTH} characters: "${address}"`);
+  }
+  return Uint8Array.from([
+    CommandT2.PERI_SET_EXTENDED_PARAM,
+    PeripheralInquiredType.SOURCE_SWITCH_CONTROL,
+    ...addressBytes,
+  ]);
+}
+
+/**
+ * ProtocolV2T2.h:1185-1199 — `[command][inquiredType][result][address:17]`.
+ *
+ * Returns null when the frame is the *other* extended-param notification (connect/disconnect),
+ * which shares this command byte and has a different shape.
+ */
+export function decodeSourceSwitchResult(
+  payload: Uint8Array
+): { result: SourceSwitchResult; address: string } | null {
+  if (payload[1] !== PeripheralInquiredType.SOURCE_SWITCH_CONTROL || payload[2] === undefined) {
+    return null;
+  }
+  return {
+    result: payload[2] as SourceSwitchResult,
+    address: new TextDecoder("utf-8").decode(payload.subarray(3, 3 + ADDRESS_LENGTH)),
+  };
+}
+
+/** Something the person can act on, rather than a number. */
+export function describeSourceSwitch(result: SourceSwitchResult): string | null {
+  switch (result) {
+    case SourceSwitchResult.SUCCESS:
+      return null;
+    case SourceSwitchResult.FAIL_CALLING:
+      return "Can't move the audio during a call.";
+    case SourceSwitchResult.FAIL_A2DP_NOT_CONNECT:
+      return "That device isn't playing audio to these headphones.";
+    case SourceSwitchResult.FAIL_GIVE_PRIORITY_TO_VOICE_ASSISTANT:
+      return "A voice assistant has the audio right now.";
+    default:
+      return "The headphones wouldn't move the audio there.";
+  }
 }
 
 export interface ConnectivityResult {

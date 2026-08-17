@@ -31,6 +31,7 @@ export function App() {
         update={update}
         isDesktop={isDesktop}
         deviceState={deviceState}
+        headphones={headphones}
         // Back to the dashboard on the way out: Settings shows no connection state, so
         // powering the headphones off from here otherwise looks like nothing happened.
         onPowerOff={

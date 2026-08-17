@@ -241,7 +241,21 @@ export enum CommandT2 {
 /** ProtocolV2T2.h:313-315 */
 export enum PeripheralInquiredType {
   PAIRING_DEVICE_MANAGEMENT_CLASSIC_BT = 0x00,
+  /** Moving the audio to a chosen connected device. */
+  SOURCE_SWITCH_CONTROL = 0x01,
   PAIRING_DEVICE_MANAGEMENT_WITH_BLUETOOTH_CLASS_OF_DEVICE = 0x02,
+}
+
+/**
+ * Why moving the audio did or didn't work. ProtocolV2T2.h:999-1006 — the failure reasons are
+ * specific enough to tell the user something useful instead of "it didn't work".
+ */
+export enum SourceSwitchResult {
+  SUCCESS = 0x00,
+  FAIL = 0x01,
+  FAIL_CALLING = 0x02,
+  FAIL_A2DP_NOT_CONNECT = 0x03,
+  FAIL_GIVE_PRIORITY_TO_VOICE_ASSISTANT = 0x04,
 }
 
 /**

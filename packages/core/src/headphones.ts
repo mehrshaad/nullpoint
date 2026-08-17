@@ -33,6 +33,7 @@ import * as Peripheral from "./payloads/peripheral.js";
 import * as Audio from "./payloads/audio.js";
 import * as System from "./payloads/system.js";
 import * as Playback from "./payloads/playback.js";
+import { FrameTrace } from "./trace.js";
 
 export interface HeadphonesState {
   modelName: string | null;
@@ -136,6 +137,11 @@ const RECLAIM_AFTER_FAILED_PROBES = 2;
 export class Headphones {
   private reassembler = new FrameReassembler();
   private seq = 0;
+  /**
+   * Frames on the wire, off by default. Nothing is recorded until someone opens the inspector,
+   * so this costs nothing in normal use.
+   */
+  readonly trace = new FrameTrace();
   private listeners = new Set<(event: HeadphonesEvent) => void>();
   private pendingAck: (() => void) | null = null;
 
@@ -535,6 +541,30 @@ export class Headphones {
     await this.refreshPairedDevices();
   }
 
+  /**
+   * Move the audio to a device that is already connected, without disturbing either connection.
+   *
+   * This is the multipoint complaint Sony has never addressed: both devices are connected, one
+   * has the sound, and there is no way to say which. Rejects with something the person can act
+   * on — the headset distinguishes "you're on a call" from "that device isn't playing".
+   */
+  async switchAudioTo(address: string): Promise<void> {
+    const response = await this.request(
+      DataType.DATA_MDR_NO2,
+      Peripheral.encodeSwitchAudioTo(address),
+      CommandT2.PERI_NTFY_EXTENDED_PARAM
+    );
+    const outcome = Peripheral.decodeSourceSwitchResult(response);
+    // A null here means the notification was about something else sharing this command byte.
+    // Refreshing tells us the truth either way, so don't invent a failure.
+    if (outcome) {
+      const problem = Peripheral.describeSourceSwitch(outcome.result);
+      if (problem) throw new Error(problem);
+    }
+    this.noteResponsive();
+    await this.refreshPairedDevices();
+  }
+
   private adoptPairedDevices(payload: Uint8Array): Peripheral.PairedDevice[] {
     const devices = Peripheral.decodePairedDevices(payload);
     this.state.pairedDevices = devices;
@@ -810,6 +840,7 @@ export class Headphones {
       const ackPromise = new Promise<void>((resolve) => {
         this.pendingAck = resolve;
       });
+      this.trace.record("tx", dataType, data, Date.now());
       await this.transport.write(frame);
       const timedOut = await Promise.race([
         ackPromise.then(() => false),
@@ -902,6 +933,7 @@ export class Headphones {
     void this.sendAck(frame.seq);
 
     const command = frame.payload[0]!;
+    this.trace.record("rx", frame.dataType, frame.payload, Date.now());
     for (const cb of this.rawResponseListeners.get(`${frame.dataType}:${command}`) ?? []) cb(frame.payload);
 
     if (isTable2) {

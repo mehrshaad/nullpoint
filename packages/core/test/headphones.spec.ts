@@ -3,11 +3,13 @@ import { Headphones } from "../src/headphones.js";
 import { LoopbackTransport } from "../src/transport.js";
 import { decodeFrameBody, packageDataForBt } from "../src/framing.js";
 import { MAX_VOLUME, codecLabel } from "../src/payloads/playback.js";
+import { labelFrame } from "../src/trace.js";
 import {
   CommandT1,
   CommandT2,
   ConnectInquiredType,
   ConnectivityActionType,
+  SourceSwitchResult,
   AudioInquiredType,
   AudioCodec,
   AutoPowerOff,
@@ -114,6 +116,8 @@ function createFakeDevice({
     // Which paired devices are currently connected. Mutated by connect/disconnect so the
     // read-back that follows reports what actually happened.
     connected: new Set([IPHONE]),
+    /** Which address currently holds the playback right. */
+    playbackAddress: IPHONE as string,
   };
 
   /** Whichever NC/ASM shape this fake speaks — the noise-adaptation one carries two more bytes. */
@@ -142,7 +146,12 @@ function createFakeDevice({
     const mdr2 = (bytes: number[]) => packageDataForBt(DataType.DATA_MDR_NO2, 0, Uint8Array.from(bytes));
 
     if (dataType === DataType.DATA_MDR_NO2) {
-      if (payload[1] !== PeripheralInquiredType.PAIRING_DEVICE_MANAGEMENT_WITH_BLUETOOTH_CLASS_OF_DEVICE) {
+      // Two inquired types share this frame: the device list, and moving the audio.
+      const type = payload[1];
+      if (
+        type !== PeripheralInquiredType.PAIRING_DEVICE_MANAGEMENT_WITH_BLUETOOTH_CLASS_OF_DEVICE &&
+        type !== PeripheralInquiredType.SOURCE_SWITCH_CONTROL
+      ) {
         return replies;
       }
       if (command === (CommandT2.PERI_GET_PARAM as number)) {
@@ -153,9 +162,26 @@ function createFakeDevice({
             PeripheralInquiredType.PAIRING_DEVICE_MANAGEMENT_WITH_BLUETOOTH_CLASS_OF_DEVICE,
             list.length,
             ...list.flat(),
-            1, // slot 1 holds the playback right
+            // The slot of whichever device currently holds the audio.
+            state.playbackAddress === IPHONE ? 1 : 2,
           ])
         );
+      }
+      if (
+        command === (CommandT2.PERI_SET_EXTENDED_PARAM as number) &&
+        payload[1] === PeripheralInquiredType.SOURCE_SWITCH_CONTROL
+      ) {
+        const address = new TextDecoder().decode(payload.subarray(2, 19));
+        state.playbackAddress = address;
+        replies.push(
+          mdr2([
+            CommandT2.PERI_NTFY_EXTENDED_PARAM,
+            PeripheralInquiredType.SOURCE_SWITCH_CONTROL,
+            SourceSwitchResult.SUCCESS,
+            ...textBytes(address),
+          ])
+        );
+        return replies;
       }
       if (command === (CommandT2.PERI_SET_EXTENDED_PARAM as number)) {
         const action = payload[2]!;
@@ -636,6 +662,63 @@ describe("Headphones.connect() over a fake device", () => {
 
     expect(hp.controllable).toBe(true);
     expect(hp.state.ncAsm?.ambientLevel).toBe(9);
+  }, 20_000);
+
+  it("records nothing until the inspector is opened", async () => {
+    // The trace must cost nothing in normal use, so it stays empty until asked.
+    const transport = new LoopbackTransport(createFakeDevice());
+    const hp = new Headphones(transport);
+    await hp.connect();
+
+    expect(hp.trace.enabled).toBe(false);
+    expect(hp.trace.list()).toHaveLength(0);
+  });
+
+  it("traces both directions once recording, and labels each frame", async () => {
+    const transport = new LoopbackTransport(createFakeDevice());
+    const hp = new Headphones(transport);
+    await hp.connect();
+
+    hp.trace.start(Date.now());
+    await hp.setNoiseMode("ambient");
+
+    const frames = hp.trace.list();
+    expect(frames.some((f) => f.direction === "tx" && f.label === "NCASM_SET_PARAM")).toBe(true);
+    expect(frames.some((f) => f.direction === "rx")).toBe(true);
+    // A pasteable session for a bug report.
+    expect(hp.trace.toText()).toMatch(/NCASM_SET_PARAM/);
+
+    hp.trace.clear();
+    expect(hp.trace.list()).toHaveLength(0);
+  }, 20_000);
+
+  it("reads a command byte against the table its frame belongs to", async () => {
+    // Table 1 and Table 2 are separate command spaces; the same byte means different things.
+    expect(labelFrame(DataType.DATA_MDR, Uint8Array.from([CommandT1.NCASM_SET_PARAM]))).toBe(
+      "NCASM_SET_PARAM"
+    );
+    expect(labelFrame(DataType.DATA_MDR_NO2, Uint8Array.from([CommandT2.PERI_RET_PARAM]))).toBe(
+      "PERI_RET_PARAM"
+    );
+    expect(labelFrame(DataType.ACK, Uint8Array.from([]))).toBe("ACK");
+  });
+
+  it("keeps the trace bounded so a long session can't grow without end", async () => {
+    const transport = new LoopbackTransport(createFakeDevice());
+    const hp = new Headphones(transport);
+    await hp.connect();
+    hp.trace.start(Date.now());
+
+    for (let i = 0; i < 500; i++) {
+      transport.emit(
+        packageDataForBt(
+          DataType.DATA_MDR,
+          0,
+          Uint8Array.from([CommandT1.EQEBB_NTFY_PARAM, EqEbbInquiredType.PRESET_EQ, EqPresetId.HEAVY, 0])
+        )
+      );
+    }
+    expect(hp.trace.list().length).toBeLessThanOrEqual(400);
   }, 20_000);
 
   it("emits 'disconnected' when the transport link drops", async () => {
@@ -1234,6 +1317,57 @@ describe("Headphones.connect() over a fake device", () => {
     expect(sets[0]!.payload[2]).toBe(ConnectivityActionType.DISCONNECT);
     expect(hp.state.pairedDevices?.find((d) => d.address === IPHONE)?.connected).toBe(false);
   });
+
+  it("moves the audio to another connected device without disconnecting either", async () => {
+    // The multipoint complaint Sony never addressed: both devices connected, one has the sound,
+    // and no way to say which.
+    const device = createFakeDevice({ table2: true });
+    const transport = new LoopbackTransport(device);
+    const hp = new Headphones(transport);
+    await hp.connect();
+    await hp.setDeviceConnection(THINKPAD, true); // both slots now in use
+    expect(hp.state.pairedDevices?.find((d) => d.address === IPHONE)?.hasPlaybackRight).toBe(true);
+
+    await hp.switchAudioTo(THINKPAD);
+
+    const after = hp.state.pairedDevices!;
+    expect(after.find((d) => d.address === THINKPAD)?.hasPlaybackRight).toBe(true);
+    expect(after.find((d) => d.address === IPHONE)?.hasPlaybackRight).toBe(false);
+    // Both stay connected — this moves the audio, it does not drop a link.
+    expect(after.every((d) => d.address === THINKPAD || d.address === IPHONE ? d.connected : true)).toBe(true);
+  }, 30_000);
+
+  it("explains why the headphones refused to move the audio", async () => {
+    const device = createFakeDevice({ table2: true });
+    const transport = new LoopbackTransport((sent) => {
+      const { dataType, payload } = decodeFrameBody(sent.subarray(1, sent.length - 1));
+      if (
+        dataType === DataType.DATA_MDR_NO2 &&
+        payload[0] === (CommandT2.PERI_SET_EXTENDED_PARAM as number) &&
+        payload[1] === PeripheralInquiredType.SOURCE_SWITCH_CONTROL
+      ) {
+        return [
+          packageDataForBt(DataType.ACK, 0, Uint8Array.from([])),
+          packageDataForBt(
+            DataType.DATA_MDR_NO2,
+            0,
+            Uint8Array.from([
+              CommandT2.PERI_NTFY_EXTENDED_PARAM,
+              PeripheralInquiredType.SOURCE_SWITCH_CONTROL,
+              SourceSwitchResult.FAIL_CALLING,
+              ...textBytes(THINKPAD),
+            ])
+          ),
+        ];
+      }
+      return device(sent);
+    });
+    const hp = new Headphones(transport);
+    await hp.connect();
+
+    // Not "it didn't work" — the headset knows exactly why, so say it.
+    await expect(hp.switchAudioTo(THINKPAD)).rejects.toThrow(/during a call/i);
+  }, 30_000);
 
   it("connects a paired device that wasn't connected", async () => {
     const transport = new LoopbackTransport(createFakeDevice({ table2: true }));

@@ -103,10 +103,13 @@ const MULTIPOINT_SLOTS = 2;
 export function ConnectedDevices({
   devices,
   onSetConnection,
+  onSwitchAudio,
 }: {
   devices: PairedDevice[];
   /** Rejects with a message worth showing when the headphones refuse. */
   onSetConnection?: (address: string, connect: boolean) => Promise<void>;
+  /** Moves the audio to an already-connected device, leaving both connected. */
+  onSwitchAudio?: (address: string) => Promise<void>;
 }) {
   // Which row is mid-request, and the last thing that went wrong on it. Kept per address so a
   // failure on one device doesn't blank out the rest of the list.
@@ -115,6 +118,22 @@ export function ConnectedDevices({
 
   const connectedCount = devices.filter((d) => d.connected).length;
   const full = connectedCount >= MULTIPOINT_SLOTS;
+
+  async function switchAudio(device: PairedDevice) {
+    if (!onSwitchAudio || pending) return;
+    setPending(device.address);
+    setError(null);
+    try {
+      await onSwitchAudio(device.address);
+    } catch (err) {
+      setError({
+        address: device.address,
+        message: err instanceof Error ? err.message : "That didn't work.",
+      });
+    } finally {
+      setPending(null);
+    }
+  }
 
   async function toggle(device: PairedDevice) {
     if (!onSetConnection || pending) return;
@@ -255,6 +274,30 @@ export function ConnectedDevices({
                     {device.connected ? "CONNECTED" : "PAIRED"}
                   </div>
                 </div>
+                {/* Only offered where it can do something: the device must be connected and not
+                    already holding the audio. */}
+                {onSwitchAudio && device.connected && !device.hasPlaybackRight && (
+                  <button
+                    onClick={() => void switchAudio(device)}
+                    disabled={pending !== null}
+                    className="mono"
+                    style={{
+                      flex: "none",
+                      fontWeight: 500,
+                      fontSize: 10,
+                      letterSpacing: "0.08em",
+                      color: "var(--accent)",
+                      border: "1px solid var(--accent)",
+                      background: "none",
+                      borderRadius: 6,
+                      padding: "5px 8px",
+                      cursor: pending ? "default" : "pointer",
+                      opacity: pending && pending !== device.address ? 0.4 : 1,
+                    }}
+                  >
+                    MAKE AUDIO
+                  </button>
+                )}
                 {onSetConnection && (
                   <button
                     onClick={() => void toggle(device)}

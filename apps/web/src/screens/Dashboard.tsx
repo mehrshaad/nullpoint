@@ -364,6 +364,7 @@ export function Dashboard({
           <ConnectedDevices
             devices={state.pairedDevices}
             onSetConnection={(address, connect) => headphones.setDeviceConnection(address, connect)}
+            onSwitchAudio={(address) => headphones.switchAudioTo(address)}
           />
         )}
       </div>
